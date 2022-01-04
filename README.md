@@ -1,5 +1,5 @@
 # DesktopTranslator
-Local cross-platform machine translation GUI, based on CTranslate2
+Local cross-platform machine translation GUI, based on [CTranslate2](https://github.com/OpenNMT/CTranslate2)
 
 
 ## Installer
@@ -23,7 +23,7 @@ pip3 install pyinstaller
 ```
 pyinstaller -y -w "translator.py"
 ```
-
+* Try the `\*.exe` file under "dist\translator" to make sure it works. It might complain about the Pmw library. The solution is either remove the Balloon lines, or add [this file](https://gist.github.com/ymoslem/c4b0cd287c7d5f2b7279dfce354d389b) to the same folder as the `translate.py` and run the aforementioned PyInstaller command again.
 * Compress the contents of the “dist” directory created by PyInstaller into a *.zip archive.
 * Download and install [NSIS](https://nsis.sourceforge.io/Download).
 * Launch NSIS, click **Installer based on a .ZIP file**, and then click **Open** to locate the **\*.zip** archive you have just created.
