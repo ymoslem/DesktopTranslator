@@ -8,7 +8,7 @@ Local cross-platform machine translation GUI, based on [CTranslate2](https://git
 ## Download Windows Installer
 
 You can either download a ready-made Windows executable installer for DesktopTranslator, or build an installer yourself.  
-[![DesktopTranslator](https://img.shields.io/badge/Download-Installer-green)](https://www.aclweb.org/anthology/2020.nlptea-1.2)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Installer-green)](https://opennmt-gui.s3.us-west-2.amazonaws.com/DesktopTranslator.exe)
 
 
 
@@ -26,7 +26,7 @@ pip3 install pyinstaller
 ```
 pyinstaller -y -w "translator.py"
 ```
-3. Try the `\*.exe` file under "dist\translator" to make sure it works. It might complain about the Pmw library. The solution is either remove the Balloon lines, or add [this file](https://gist.github.com/ymoslem/c4b0cd287c7d5f2b7279dfce354d389b) to the same folder as the `translate.py` and run the aforementioned PyInstaller command again.
+3. Try the `*.exe` file under "dist\translator" to make sure it works. It might complain about the Pmw library. The solution is either remove the Balloon lines, or add [this file](https://gist.github.com/ymoslem/c4b0cd287c7d5f2b7279dfce354d389b) to the same folder as the `translate.py` and run the aforementioned PyInstaller command again.
 4. Compress the contents of the “dist” directory created by PyInstaller into a *.zip archive.
 5. Download and install [NSIS](https://nsis.sourceforge.io/Download).
 6. Launch NSIS, click **Installer based on a .ZIP file**, and then click **Open** to locate the **\*.zip** archive you have just created.
