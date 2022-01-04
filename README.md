@@ -10,7 +10,8 @@ Local cross-platform machine translation GUI, based on [CTranslate2](https://git
 You can either download a ready-made Windows executable installer for DesktopTranslator, or build an installer yourself.  
 [![DesktopTranslator](https://img.shields.io/badge/Download-Installer-green)](https://opennmt-gui.s3.us-west-2.amazonaws.com/DesktopTranslator.exe)
 
-
+    
+<img src="img/installer.png" width="60%">
 
 
 ## Build Windows Installer
