@@ -48,11 +48,11 @@ class TranslatorGUI():
         self.statusbar = tk.Label(self.main_frame, borderwidth=1, relief=tk.SUNKEN, padx=5, pady=5, anchor=tk.W, bg="white smoke", fg="black", text="Select a model and enter text to translate!")
         self.statusbar.grid(row=2, column=0, columnspan=2, sticky="nsew")
 
-        # Create the select model button
+        # Create the select CTranslate2 model button
         self.button_model = tk.Button(self.toolbar, text="CTranslate2 Model", width=20, highlightbackground="white smoke", command=self.open_model)
         self.button_model.pack(side=tk.LEFT, padx=2, pady=2, fill=tk.X)        
 
-        # Create the select model button
+        # Create the select SentencePiece model button
         self.button_sp_model = tk.Button(self.toolbar, text="SentencePiece Model", width=20, highlightbackground="white smoke", command=self.open_sp_model)
         self.button_sp_model.pack(side=tk.LEFT, padx=2, pady=2, fill=tk.X)        
 
@@ -60,13 +60,13 @@ class TranslatorGUI():
         self.button_translate = tk.Button(self.toolbar, text="Translate", width=20, highlightbackground="white smoke", command=self.translate_input)
         self.button_translate.pack(side=tk.LEFT, padx=2, pady=2, fill=tk.X)
 
-        # Create the ballon object and bind it to the buttons
+        # Create the balloon object and bind it to the buttons
         Pmw.initialise(self.window)
         self.balloon = Pmw.Balloon(self.window)
         self.balloon.bind(self.button_model, "Select CTranslate2 model direcotry")
         self.balloon.bind(self.button_sp_model, "Select a SentencePiece source model")
         self.balloon.bind(self.button_translate, "Translate the source text")
-        # Change the background colour of the ballon
+        # Change the background colour of the balloon
         self.lbl = self.balloon.component("label")
         self.lbl.config(background="white", padx=1, pady=1)
 
