@@ -2,17 +2,20 @@
 Local cross-platform machine translation GUI, based on [CTranslate2](https://github.com/OpenNMT/CTranslate2)
 
 
-## Installer
+<kbd> ![DesktopTranslator](img/DesktopTranslator.png)
 
-You can either download a ready-made installer or build an installer yourself.
 
-### • Download Installer
+## Download Windows Installer
 
-You can download a ready installer for DesktopTranslator here.
+You can either download a ready-made Windows executable installer for DesktopTranslator, or build an installer yourself.  
+[![DesktopTranslator](https://img.shields.io/badge/Download-Installer-green)](https://www.aclweb.org/anthology/2020.nlptea-1.2)
 
-### • Build Installer
 
-If you rather want to adjust the code and then build an installer yourself, you can follow these steps:
+
+
+## Build Windows Installer
+
+Alternatively, if you want to adjust the code and then build an installer yourself, you can follow these steps:
 
 1. Install PyInstaller:
 ```
@@ -37,6 +40,5 @@ SectionEnd
 ```
 9. Finally, click the NSIS **Generate** button, which will create the ***.exe** installer that can be shipped to other Windows machines, without the need to install any extra requirements.
 10. After installation, if you applied step \#8, you should find an icon on the Desktop. To uninstall, you can simple remove the app forlder from "Program Files". For more NSIS options, check this [example](https://nsis.sourceforge.io/A_simple_installer_with_start_menu_shortcut_and_uninstaller).
-
 
 
