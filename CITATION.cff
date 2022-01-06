@@ -1,0 +1,17 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: DesktopTranslator
+message: 'If you use this app, please cite this'
+type: software
+authors:
+  - given-names: Yasmin
+    family-names: Moslem
+    email: yasmin@machinetranslation.io
+    affiliation: MachineTranslation.io
+identifiers:
+  - type: url
+    value: 'https://github.com/ymoslem/DesktopTranslator'
+repository-code: 'https://github.com/ymoslem/DesktopTranslator'
+url: 'https://www.machinetranslation.io/'
