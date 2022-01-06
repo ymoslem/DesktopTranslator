@@ -28,7 +28,7 @@ If you would like to try out the app and you do not have a model, you can downlo
 
 ## Build Windows Installer
 
-Alternatively, if you want to adjust the code and then build an installer yourself, you can follow these steps:
+If you want to adjust the code and then build an installer yourself, you can follow these steps:
 
 1. Install PyInstaller:
 ```
