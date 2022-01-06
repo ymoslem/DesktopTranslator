@@ -14,6 +14,18 @@ You can either download a ready-made Windows executable installer for DesktopTra
 <img src="img/installer.png" width="60%">
 
 
+## Translation Models
+
+Currently, DesktopTranslator supports CTranslate2 models, and SentencePiece subwording models (you need both). If you have a model for OpenNMT-py, OpenNMT-tf, or FairSeq, you can convert it to a CTranslate2 format.
+
+If you would like to try out the app and you do not have a model, you can download my [French-to-English generic model here](https://pretrained-nmt-models.s3.us-west-2.amazonaws.com/CTranslate2/fren/fren.zip). 
+1. Unzip the `fren.zip` archive of the French-to-English generic model you just downloaded. It has two folders, `ct2_model` for the CTranslate2 model and `sp_model` for the SentencePiece subwording models of French (source) and English (target).
+2. In DesktopTranslator, click the <kbd>CTranslate2 Model</kbd> button, and select the `ct2_model` folder.
+3. Click the <kbd>SentencePiece Model</kbd> button, navigate to the `sp_model` folder, and select `fr.model`.
+4. In the left input text-area, type some text in French or use the <kbd>File</kbd> menu \> <kbd>Open...</kbd> to open a *.txt file.
+5. Click the <kbd>Translate</kbd> button.
+
+
 ## Build Windows Installer
 
 Alternatively, if you want to adjust the code and then build an installer yourself, you can follow these steps:
