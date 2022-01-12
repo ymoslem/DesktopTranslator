@@ -11,7 +11,7 @@ from charset_normalizer import from_path
 import os
 
 
-class TranslatorGUI():
+class TranslatorGUI:
     def __init__(self, window):
         self.window = window
         self.window.title("DesktopTranslator")
