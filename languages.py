@@ -1,5 +1,4 @@
 langs = {
-    "None": "",
     "Afrikaans" : "__af__",
     "Amharic" : "__am__",
     "Arabic" : "__ar__",
