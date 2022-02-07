@@ -4,11 +4,20 @@ Local cross-platform machine translation GUI, based on [CTranslate2](https://git
 
 <kbd> ![DesktopTranslator](img/DesktopTranslator.png)
 
+**Table of contents**
 
+1. [Download Windows Installer](#download-windows-installer)
+1. [Translation Models](#translation-models)
+    * [French-to-English Generic Model](#french-to-english-generic-model)
+    * [M2M-100 Multilingual Model](#m2m-100-multilingual-model)
+1. [[Optional] Build Windows Installer](#optional-build-windows-installer)
+1. [References](#references)
+
+    
 ## Download Windows Installer
 
 You can either download a ready-made Windows executable installer for DesktopTranslator, or build an installer yourself.  
-[![DesktopTranslator](https://img.shields.io/badge/Download-Installer-green)](https://opennmt-gui.s3.us-west-2.amazonaws.com/DesktopTranslator.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Installer-green)](https://opennmt-gui.s3.us-west-2.amazonaws.com/DesktopTranslator_0.2.0.exe)
 
     
 <img src="img/installer.png" width="60%">
@@ -46,7 +55,7 @@ To use M2M-100 models in DesktopTranslator, please follow these steps:
 7. In the left input text-area, type some text in any language or your choice or use the <kbd>File</kbd> menu \> <kbd>Open...</kbd> to open a *.txt file.
 8. Click the <kbd>Translate</kbd> button.
 
-## Build Windows Installer
+## [Optional] Build Windows Installer
 
 If you want to adjust the code and then build an installer yourself, you can follow these steps:
 
@@ -78,3 +87,9 @@ SectionEnd
 If you get a permission error while try to save the edited version of “Modern.nsh”, right-click Notepad, and select "Run as administrator". Then, copy the file content into a new file, and save it to the original location.
 9. Finally, click the NSIS **Generate** button, which will create the ***.exe** installer that can be shipped to other Windows machines, without the need to install any extra requirements.
 10. After installation, if you applied step \#8, you should find an icon on the Desktop. To uninstall, you can simple remove the app forlder from "Program Files". For more NSIS options, check this [example](https://nsis.sourceforge.io/A_simple_installer_with_start_menu_shortcut_and_uninstaller).
+
+
+## References
+
+* [Efficient and High-Quality Neural Machine Translation with OpenNMT, Klein et al., 2020](https://aclanthology.org/2020.ngt-1.25/)
+* [Beyond English-Centric Multilingual Machine Translation, Fan et al., 2020](https://arxiv.org/abs/2010.11125)
