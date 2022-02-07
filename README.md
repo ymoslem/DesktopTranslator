@@ -44,7 +44,7 @@ If you would like to add an extra folder, e.g. "utils", the command will be:
 pyinstaller -y -w --add-data="utils/*;utils/" "translator.py"
 ```
 3. Try the `*.exe` file under "dist\translator" to make sure it works. It might complain about the Pmw library. The solution is either remove the Balloon lines, or add [this file](https://gist.github.com/ymoslem/c4b0cd287c7d5f2b7279dfce354d389b) to the same folder as the `translate.py` and run the aforementioned PyInstaller command again.
-4. Compress the contents of the “dist” directory created by PyInstaller into a *.zip archive.
+4. Compress the contents of the “dist” directory created by PyInstaller into a *.zip archive. For example, you can find a folder called "translator"; give it the name you like, e.g. "DesktopTranslator", and add it to a *.zip archive.
 5. Download and install [NSIS](https://nsis.sourceforge.io/Download).
 6. Launch NSIS, click **Installer based on a .ZIP file**, and then click **Open** to locate the **\*.zip** archive you have just created.
 7. If you want to make the files installed (extracted) to the “Program Files” of the target user, in the **Default Folder** enter `$PROGRAMFILES`
