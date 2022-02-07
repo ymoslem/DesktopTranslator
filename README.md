@@ -30,7 +30,11 @@ If you would like to try out the app and you do not have a model, you can downlo
 
 ### M2M-100 Multilingual Model
 
-Currently, DesktopTranslator supports M2M-100 multilingual models ([Fan et al., 2020](https://arxiv.org/abs/2010.11125)). To be able use M2M-100 for translation between 100 languages in DesktopTranslator, please follow these steps:
+Currently, DesktopTranslator supports M2M-100 multilingual models ([Fan et al., 2020](https://arxiv.org/abs/2010.11125)). With an M2M-100 model, you can translate between 100 languages.
+    
+<kbd> ![DesktopTranslator](img/DesktopTranslator_M2M-100.png)
+
+To use M2M-100 models in DesktopTranslator, please follow these steps:
 1. Download one the CTranslate2 version of the M2M-100 models:
     a. [M2M-100 418M-parameter model](https://pretrained-nmt-models.s3.us-west-2.amazonaws.com/CTranslate2/m2m100/m2m100_ct2_418m.zip); smaller and faster, but sometimes less accurate; or
     b. [M2M-100 1.2B-parameter model](https://pretrained-nmt-models.s3.us-west-2.amazonaws.com/CTranslate2/m2m100/m2m100_ct2_12b.zip); bigger and somehow slower, but sometimes more accurate.
