@@ -1,5 +1,6 @@
 import tkinter as tk
-from tkinter.filedialog import askopenfilename, askopenfile, askdirectory, asksaveasfile
+from tkinter import ttk
+from tkinter.filedialog import askopenfilename, askopenfile, askdirectory, asksaveasfilename
 from tkinter.messagebox import showinfo, showerror
 import Pmw
 from tqdm.tk import tqdm
@@ -9,6 +10,9 @@ import ctranslate2
 import sentencepiece as spm
 from charset_normalizer import from_path
 import os
+import webbrowser
+import json
+from utils.paragraph_splitter import paragraph_tokenizer, paragraph_detokenizer
 
 
 class TranslatorGUI:
@@ -25,7 +29,7 @@ class TranslatorGUI:
         self.model = tk.StringVar(self.main_frame)
         self.sp_model = tk.StringVar(self.main_frame)
         self.beam_size = tk.IntVar(self.main_frame)
-        self.beam_size.set(2)
+        self.beam_size.set(3)
 
         self.createWidgets()
         self.createMenu()
@@ -36,12 +40,12 @@ class TranslatorGUI:
         self.toolbar.grid(row=0, column=0, columnspan=2, sticky="nsew")
 
         # Create the source text input
-        self.source_text = tk.Text(self.main_frame, borderwidth=2, relief=tk.SUNKEN, padx=5, pady=5, font=("Arial", 14), undo=True, highlightcolor="white smoke", highlightbackground="white smoke")
+        self.source_text = tk.Text(self.main_frame, wrap="word", borderwidth=2, relief=tk.SUNKEN, padx=5, pady=5, font=("Arial", 14), undo=True, highlightcolor="white smoke", highlightbackground="white smoke")
         self.source_text.grid(row=1, column=0, sticky="nsew")
         self.source_text.focus_set()
 
         # Create the target text input
-        self.target_text = tk.Text(self.main_frame, borderwidth=2, relief=tk.SUNKEN, padx=5, pady=5, font=("Arial", 14), undo=True, highlightcolor="white smoke", highlightbackground="white smoke")
+        self.target_text = tk.Text(self.main_frame, wrap="word", borderwidth=2, relief=tk.SUNKEN, padx=5, pady=5, font=("Arial", 14), undo=True, highlightcolor="white smoke", highlightbackground="white smoke")
         self.target_text.grid(row=1, column=1, sticky="nsew")
 
         # Create the statusbar
@@ -77,10 +81,49 @@ class TranslatorGUI:
         self.beam_size_label = tk.Label(self.labelframe, background="white smoke", text="Beam Size:")
         self.beam_size_label.pack(side=tk.LEFT, ipady=5)
 
-        self.values = {"2":2, "3":3, "5":5}
+        values = {"2":2, "3":3, "5":5}
 
-        for (text, value) in self.values.items():
+        for (text, value) in values.items():
             tk.Radiobutton(self.labelframe, text=text, variable=self.beam_size, value=value,  background="white smoke").pack(side=tk.LEFT, ipady=2)
+
+        # M2M widgets
+
+        # Create a vertical separator
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure('TCombobox', selectbackground="white smoke", selectforeground="black", padding=3)
+
+        separator = ttk.Separator(self.toolbar, orient='vertical')
+        separator.pack(side=tk.LEFT, fill=tk.Y)
+
+        self.m2m_label = tk.Label(self.toolbar, background="white smoke", text="M2M-100:")
+        self.m2m_label.pack(side=tk.LEFT, padx=2, pady=2)
+
+        # Load the JSON containing M2M-100 model supported languages
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        json_file = os.path.join(dir_path, "utils", "m2m_languages.json")
+        with open(json_file) as m2m_languages:
+            self.language_codes = json.load(m2m_languages)
+        languages = ["None"] + sorted(self.language_codes)
+
+        # Create M2M-100 language selection combobox
+        self.combobox = ttk.Combobox(self.toolbar, values=languages)
+        self.combobox.pack(side=tk.LEFT, padx=2, pady=2, fill=tk.BOTH)
+        self.combobox.current(0)
+        self.balloon.bind(self.combobox, "If you use M2M-100 model, select the language you want to translate to")
+
+        # Create download buttons for M2M-100 models
+        self.download_label = tk.Label(self.toolbar, background="white smoke", text="Download:")
+        self.download_label.pack(side=tk.LEFT, padx=2, pady=2)
+
+        self.download_button_418m = tk.Button(self.toolbar, highlightbackground="white smoke", text="418M", cursor="hand2", width=4, command=self.download_m2m_418m)
+        self.download_button_418m.pack(side=tk.LEFT, padx=2, pady=2)
+        self.balloon.bind(self.download_button_418m, "Download M2M-100 418M-parameter model (faster, but less accurate)")
+
+        self.download_button_12b = tk.Button(self.toolbar, highlightbackground="white smoke", text="1.2B", cursor="hand2", width=4, command=self.download_m2m_12b)
+        self.download_button_12b.pack(side=tk.LEFT, padx=2, pady=2)
+        self.balloon.bind(self.download_button_12b, "Download M2M-100 1.2B-parameter model (slower, but more accurate)")
+
 
     def createMenu(self):
         # Create the menu bar and add the menu items
@@ -147,7 +190,7 @@ class TranslatorGUI:
         self.source_text.see(tk.INSERT)
 
     def open_file(self):
-        self.file_name = askopenfilename(filetypes=[('Text Files', '*.txt')])
+        self.file_name = askopenfilename(filetypes=[("Text Files", "*.txt")])
         if self.file_name:
             self.source_text.delete(1.0, tk.END)
 
@@ -158,12 +201,12 @@ class TranslatorGUI:
             self.statusbar.config(text="Lines: " + str(self.line_count) + " | Words: " + str(len(self.source_file_text.split())))
 
     def save_file(self):
-        self.file = asksaveasfile(mode='w', defaultextension='.txt')
+        self.file = asksaveasfilename(filetypes=[("Text Files", "*.txt")], defaultextension='.txt')
         if self.file is not None:
             self.data = self.target_text.get(1.0, tk.END)
             if len(self.data) > 0:
-                self.file.write(self.data)
-                self.file.close()
+                with open(self.file, "w+", encoding="utf-8") as output:
+                    output.write(self.data)
             else:
                 showinfo("", "Nothing to save!")
 
@@ -173,7 +216,7 @@ class TranslatorGUI:
         self.statusbar.config(text="")
 
     def show_info(self):
-        showinfo("About", "DesktopTranslator\n\n\nDeveloped by: Yasmin Moslem\nhttps://www.machinetranslation.io/")
+        showinfo("About", "DesktopTranslator (0.2.0)\n\n\nDeveloped by: Yasmin Moslem\nwww.machinetranslation.io")
 
     def open_model(self):
         self.toolbar.update()  # for Mac
@@ -199,50 +242,80 @@ class TranslatorGUI:
             self.statusbar.config(text="SP Model path: " + self.model_file.name)
             self.sp_source_model = spm.SentencePieceProcessor(self.model_file.name)
 
-    def chunks(lst, n):
-        """Yield successive n-sized chunks from lst."""
-        for i in range(0, len(lst), n):
-            yield lst[i:i+n]
+    def download_m2m_418m(self):
+        self.toolbar.update()  # for Mac
+        webbrowser.open_new("https://pretrained-nmt-models.s3.us-west-2.amazonaws.com/CTranslate2/m2m100/m2m100_ct2_418m.zip")
+
+    def download_m2m_12b(self):
+        self.toolbar.update()  # for Mac
+        webbrowser.open_new("https://pretrained-nmt-models.s3.us-west-2.amazonaws.com/CTranslate2/m2m100/m2m100_ct2_12b.zip")
 
     def translate_input(self):
         self.target_text.delete(1.0, tk.END)
+        
+        lang_option = self.combobox.get()
+        self.lang_code = self.language_codes[lang_option] if lang_option != "None" else ""
+
         self.source_text_string = self.source_text.get(1.0, tk.END)
 
-        if len(self.source_text_string) > 1:
+        if "m2m" in self.model_dir and self.lang_code == "":
+            showerror("M2M Model", "It seems you selected an M2M-100 model. Please specify the target language into which the text to be translated.")
+
+        elif "m2m" not in self.model_dir and self.lang_code != "":
+            showerror("Not an M2M Model", "It seems the model you selected is not an M2M-100 model. In the M2M-100 dropdown list, please select 'None'.")
+
+        elif len(self.source_text_string) > 1:
             self.statusbar.config(text="Translating...")
-            self.source_sents = self.source_text_string.splitlines()
+            #self.source_sents = self.source_text_string.splitlines()
+            self.source_sents, self.breaks = paragraph_tokenizer(self.source_text_string)
 
             self.start = datetime.now()
-            self.max_batch_size = 2048
-            self.beam_size_val = self.beam_size.get()
+            max_batch_size = 2048
+            beam_size_val = self.beam_size.get()
 
             if self.model.get() != "" and self.sp_model.get() != "":
                 self.n_splits = round((len(self.source_sents)/16)+0.5)
                 self.splits = array_split(array(self.source_sents), self.n_splits)
                 self.splits = [split.tolist() for split in self.splits]
 
+                translations = []
+
                 with tqdm(total=len(self.source_text_string.split()), desc="Translation progress (words)", unit=" split", disable=(len(self.splits)<2), leave=False) as tq:
                     tq.refresh()
                     self.main_frame.update()
 
                     for split in self.splits:
-                        self.source_sents_tok = self.sp_source_model.encode(split, out_type=str)
-                        self.translations_tok = self.translator.translate_batch(
-                                                                        source=self.source_sents_tok,
-                                                                        beam_size=self.beam_size_val,
-                                                                        batch_type="tokens",
-                                                                        max_batch_size=self.max_batch_size,
-                                                                        replace_unknowns=True)
-                        self.translations_so_far = [" ".join(translation[0]["tokens"]).replace(" ", "").replace("▁", " ").strip() for translation in self.translations_tok]
+                        if self.lang_code != "":
+                            lang_prefix = [[self.lang_code]] * len(split)
+                            start_pos = 7
+                            max_batch_size = 1024
+                        else:
+                            lang_prefix = None
+                            start_pos = 0
 
-                        self.target_text.insert(tk.END, "\n".join(self.translations_so_far)+"\n")
+                        source_sents_tok = self.sp_source_model.encode(split, out_type=str)
+                        translations_tok = self.translator.translate_batch(
+                                                                        source=source_sents_tok,
+                                                                        beam_size=beam_size_val,
+                                                                        batch_type="tokens",
+                                                                        max_batch_size=max_batch_size,
+                                                                        replace_unknowns=True,
+                                                                        repetition_penalty=1.2,
+                                                                        target_prefix=lang_prefix)
+                        
+                        translations_so_far = [" ".join(translation[0]["tokens"]).replace(" ", "").replace("▁", " ")[start_pos:].strip() for translation in translations_tok]
+                        translations.extend(translations_so_far)
+
 
                         tq.update(len(" ".join(split).split()))
                         tq.refresh()
                         self.main_frame.update()
 
-                    self.elapsed = str(datetime.now() - self.start)
-                    self.statusbar.config(text="Congratulations! Translation completed. Time elapsed: " + self.elapsed)
+                    translations_formatted = paragraph_detokenizer(translations, self.breaks)
+                    self.target_text.insert(tk.END, translations_formatted + "\n")
+
+                    elapsed = str(datetime.now() - self.start)
+                    self.statusbar.config(text="Congratulations! Translation completed. Time elapsed: " + elapsed)
 
             else:
                 showinfo("No model selected", "Please select both CTranslate2 and SentencePiece models, and enter text to translate!")
