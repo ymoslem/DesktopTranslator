@@ -20,7 +20,6 @@ Local cross-platform machine translation GUI, based on [CTranslate2](https://git
 You can either download a ready-made Windows executable installer for DesktopTranslator, or build an installer yourself.  
 [![DesktopTranslator](https://img.shields.io/badge/Download-Installer-green)](https://opennmt-gui.s3.us-west-2.amazonaws.com/DesktopTranslator_0.2.0.exe)
 
-    
 <img src="img/installer.png" width="60%">
 
 
@@ -40,7 +39,7 @@ If you would like to try out the app and you do not have a model, you can downlo
 
 ### M2M-100 Multilingual Model
 
-Currently, DesktopTranslator supports **M2M-100** ([Fan et al., 2020](https://arxiv.org/abs/2010.11125)), a multilingual model that can translate between 100 languages.
+Now, DesktopTranslator supports **M2M-100** ([Fan et al., 2020](https://arxiv.org/abs/2010.11125)), a multilingual model that can translate between 100 languages.
     
 <kbd> ![DesktopTranslator](img/DesktopTranslator_M2M-100.png)
 
@@ -55,6 +54,7 @@ To use M2M-100 models in DesktopTranslator, please follow these steps:
 6. The default <kbd>Beam Size</kbd> is 3. You can increase it to 5, which can be slower, but sometimes results in better translation quality.
 7. In the left input text-area, type some text in any language or your choice of use the <kbd>File</kbd> menu \> <kbd>Open...</kbd> to open a *.txt file.
 8. Click the <kbd>Translate</kbd> button.
+
 
 ## [Optional] Build Windows Installer
 
@@ -78,7 +78,7 @@ pyinstaller -y -w --add-data="utils/*;utils/" "translator.py"
 5. Download and install [NSIS](https://nsis.sourceforge.io/Download).
 6. Launch NSIS, click **Installer based on a .ZIP file**, and then click **Open** to locate the **\*.zip** archive you have just created.
 7. If you want to make the files installed (extracted) to the “Program Files” of the target user, in the **Default Folder** enter `$PROGRAMFILES`
-8. If you want to add a shortcut to the internal *.exe file on the Desktop after installation, you can add something like this to the file “Modern.nsh” located at: "C:\Program Files\NSIS\Contrib\zip2exe\". Depending on your OS, the path could be at “Program Files (x86)”. Note that the exe path should be consistent with the path you selected under NSIS’s “Default Folder” drop-down menu, the folder name, and the exe file name.
+8. If you want to add a shortcut to the internal *.exe file on the Desktop after installation, you can add something like this to the file “Modern.nsh” located at: "C:\Program Files\NSIS\Contrib\zip2exe\". Depending on your OS, the path could be at “Program Files (x86)”. Note that the EXE file path should be consistent with the path you selected under NSIS’s “Default Folder” drop-down menu, the folder name, and the EXE file name.
 ```
 Section "Desktop Shortcut" SectionX
     SetShellVarContext current
@@ -87,7 +87,7 @@ SectionEnd
 ```
 If you get a permission error while trying to save the edited version of “Modern.nsh”, right-click your text editor (e.g. _Notepad_), and select "Run as administrator". Then, copy the contents of the file into a new file, and save it to the original location.  
 9. Finally, click the NSIS **Generate** button, which will create the ***.exe** installer that can be shipped to other Windows machines, without the need to install any extra requirements.
-10. After installation, if you applied step \#8, you should find an icon on the Desktop. To uninstall, you can simply remove the app forlder from "Program Files". For more NSIS options, check this [example](https://nsis.sourceforge.io/A_simple_installer_with_start_menu_shortcut_and_uninstaller).
+10. After installation, if you applied step \#8, you should find an icon on the Desktop. To uninstall, you can simply remove the app folder from "Program Files". For more NSIS options, check this [example](https://nsis.sourceforge.io/A_simple_installer_with_start_menu_shortcut_and_uninstaller).
 
 
 ## References
