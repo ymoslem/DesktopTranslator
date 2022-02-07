@@ -1,6 +1,7 @@
+[![DesktopTranslator](https://img.shields.io/badge/Download-Installer-green)](https://opennmt-gui.s3.us-west-2.amazonaws.com/DesktopTranslator_0.2.0.exe)
+
 # DesktopTranslator
 Local cross-platform machine translation GUI, based on [CTranslate2](https://github.com/OpenNMT/CTranslate2)
-
 
 <kbd> ![DesktopTranslator](img/DesktopTranslator.png)
 
@@ -44,15 +45,15 @@ Currently, DesktopTranslator supports **M2M-100** ([Fan et al., 2020](https://ar
 <kbd> ![DesktopTranslator](img/DesktopTranslator_M2M-100.png)
 
 To use M2M-100 models in DesktopTranslator, please follow these steps:
-1. Download one the CTranslate2 version of the M2M-100 models:
-    a. [M2M-100 418M-parameter model](https://pretrained-nmt-models.s3.us-west-2.amazonaws.com/CTranslate2/m2m100/m2m100_ct2_418m.zip); smaller and faster, but sometimes less accurate; or
+1. Download one of the M2M-100 models, converted to the CTranslate2 format:  
+    a. [M2M-100 418M-parameter model](https://pretrained-nmt-models.s3.us-west-2.amazonaws.com/CTranslate2/m2m100/m2m100_ct2_418m.zip); smaller and faster, but sometimes less accurate; or  
     b. [M2M-100 1.2B-parameter model](https://pretrained-nmt-models.s3.us-west-2.amazonaws.com/CTranslate2/m2m100/m2m100_ct2_12b.zip); bigger and somehow slower, but sometimes more accurate.
 2. Extract the *.zip arhieve of the model you downloaded.
 3. In DesktopTranslator, click the <kbd>CTranslate2 Model</kbd> button, and select the `m2m100_418m` or `m2m100_12b` folder.
 4. Click the <kbd>SentencePiece Model</kbd> button, and from the same model folder, select `sentencepiece.model`.
 5. **Important:** From the <kbd>M2M-100</kbd> dropdown list, select the target language to which you want to translate. This step is different between M2M-100 and some other models. M2M-100 models require a language code prefix. For other models that do not require this, keep the "None" option.
 6. The default <kbd>Beam Size</kbd> is 3. You can increase it to 5, which can be slower, but sometimes results in better translation quality.
-7. In the left input text-area, type some text in any language or your choice or use the <kbd>File</kbd> menu \> <kbd>Open...</kbd> to open a *.txt file.
+7. In the left input text-area, type some text in any language or your choice of use the <kbd>File</kbd> menu \> <kbd>Open...</kbd> to open a *.txt file.
 8. Click the <kbd>Translate</kbd> button.
 
 ## [Optional] Build Windows Installer
@@ -84,9 +85,9 @@ Section "Desktop Shortcut" SectionX
     CreateShortCut "$DESKTOP\DesktopTranslator.lnk" "$PROGRAMFILES\DesktopTranslator\translator.exe"
 SectionEnd
 ```
-If you get a permission error while try to save the edited version of “Modern.nsh”, right-click Notepad, and select "Run as administrator". Then, copy the file content into a new file, and save it to the original location.
+If you get a permission error while trying to save the edited version of “Modern.nsh”, right-click your text editor (e.g. _Notepad_), and select "Run as administrator". Then, copy the contents of the file into a new file, and save it to the original location.  
 9. Finally, click the NSIS **Generate** button, which will create the ***.exe** installer that can be shipped to other Windows machines, without the need to install any extra requirements.
-10. After installation, if you applied step \#8, you should find an icon on the Desktop. To uninstall, you can simple remove the app forlder from "Program Files". For more NSIS options, check this [example](https://nsis.sourceforge.io/A_simple_installer_with_start_menu_shortcut_and_uninstaller).
+10. After installation, if you applied step \#8, you should find an icon on the Desktop. To uninstall, you can simply remove the app forlder from "Program Files". For more NSIS options, check this [example](https://nsis.sourceforge.io/A_simple_installer_with_start_menu_shortcut_and_uninstaller).
 
 
 ## References
