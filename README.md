@@ -39,7 +39,7 @@ If you would like to try out the app and you do not have a model, you can downlo
 
 ### M2M-100 Multilingual Model
 
-Currently, DesktopTranslator supports M2M-100 multilingual models ([Fan et al., 2020](https://arxiv.org/abs/2010.11125)). With an M2M-100 model, you can translate between 100 languages.
+Currently, DesktopTranslator supports **M2M-100** ([Fan et al., 2020](https://arxiv.org/abs/2010.11125)), a multilingual model that can translate between 100 languages.
     
 <kbd> ![DesktopTranslator](img/DesktopTranslator_M2M-100.png)
 
