@@ -25,7 +25,7 @@ You can either download a ready-made Windows executable installer for DesktopTra
 
 ## Translation Models
 
-Currently, DesktopTranslator supports CTranslate2 models, and SentencePiece subwording models (you need both). If you have a model for OpenNMT-py, OpenNMT-tf, or FairSeq, you can convert it to a CTranslate2 format.
+Currently, DesktopTranslator supports CTranslate2 models, and SentencePiece subwording models (you need both). If you have a model for OpenNMT-py, OpenNMT-tf, or FairSeq, you can [convert it to the CTranslate2 format](https://github.com/OpenNMT/CTranslate2#quickstart).
 
 ### French-to-English Generic Model
 
@@ -39,7 +39,7 @@ If you would like to try out the app and you do not have a model, you can downlo
 
 ### M2M-100 Multilingual Model
 
-Now, DesktopTranslator supports **M2M-100** ([Fan et al., 2020](https://arxiv.org/abs/2010.11125)), a multilingual model that can translate between 100 languages.
+Now, DesktopTranslator supports [**M2M-100**](https://github.com/pytorch/fairseq/tree/main/examples/m2m_100) ([Fan et al., 2020](https://arxiv.org/abs/2010.11125)), a multilingual model that can translate between 100 languages.
     
 <kbd> ![DesktopTranslator](img/DesktopTranslator_M2M-100.png)
 
