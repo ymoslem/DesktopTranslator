@@ -1,6 +1,7 @@
 charset-normalizer==2.0.9
 ctranslate2==2.10.1
 numpy==1.21.4
+nltk==3.6.7
 Pmw==2.0.1
 sentencepiece==0.1.96
 tqdm==4.62.3
