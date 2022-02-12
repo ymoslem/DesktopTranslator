@@ -45,8 +45,8 @@ Now, DesktopTranslator supports [**M2M-100**](https://github.com/pytorch/fairseq
 
 To use M2M-100 models in DesktopTranslator, please follow these steps:
 1. Download one of the M2M-100 models, converted to the CTranslate2 format:  
-    a. [M2M-100 418M-parameter model](https://pretrained-nmt-models.s3.us-west-2.amazonaws.com/CTranslate2/m2m100/m2m100_ct2_418m.zip); smaller and faster, but sometimes less accurate; or  
-    b. [M2M-100 1.2B-parameter model](https://pretrained-nmt-models.s3.us-west-2.amazonaws.com/CTranslate2/m2m100/m2m100_ct2_12b.zip); bigger and somehow slower, but sometimes more accurate.
+    a. [M2M-100 418M-parameter model](https://bit.ly/33fM1AO); smaller and faster, but sometimes less accurate; or  
+    b. [M2M-100 1.2B-parameter model](https://bit.ly/3GYiaed); bigger and somehow slower, but sometimes more accurate.
 2. Extract the *.zip arhieve of the model you downloaded.
 3. In DesktopTranslator, click the <kbd>CTranslate2 Model</kbd> button, and select the `m2m100_418m` or `m2m100_12b` folder.
 4. Click the <kbd>SentencePiece Model</kbd> button, and from the same model folder, select `sentencepiece.model`.
