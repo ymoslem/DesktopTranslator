@@ -385,10 +385,11 @@ class TranslatorGUI:
     def detect_language(self, text):
         pretrained_lang_model = "utils/lid.176.ftz"
         model = fasttext.load_model(pretrained_lang_model)
-        text = text.lower(text[:200]) if len(text) > 200 else text.lower()
-        prediction = model.predict(text.replace("\n", " "), k=1)
-        self.detected_lang_code = prediction[0][0][-2:]
-        return self.detected_lang_code
+        text = text[:200].lower() if len(text) > 200 else text.lower()
+        prediction = model.predict(text.replace("\n", " "), k=2)
+        self.detected_lang_code = prediction[0][0][9:]
+        self.detected_lang_code_alt = prediction[0][1][9:]
+        return self.detected_lang_code, self.detected_lang_code_alt
 
     def translate_input(self):
         self.target_text.delete(1.0, tk.END)
@@ -421,7 +422,16 @@ class TranslatorGUI:
             self.target_lang_code = (
                 self.language_codes[lang_option] if lang_option != "None" else ""
             )
-            self.source_lang_code = self.detect_language(self.source_text_string)
+            self.source_lang_codes = self.detect_language(self.source_text_string)
+
+            self.source_lang_code = self.source_lang_codes[0]
+            self.src_prefix = "__" + self.source_lang_codes[0] + "__"
+            if self.src_prefix not in self.language_codes.values():
+                self.source_lang_code = self.source_lang_codes[1]
+                self.src_prefix = "__" + self.source_lang_codes[1] + "__"
+                if self.src_prefix not in self.language_codes.values():
+                    showerror("", "Source language not supported or not recognized! Try to add more text.")
+                    return
 
             self.source_sents, self.breaks = paragraph_tokenizer(
                 self.source_text_string, self.source_lang_code
@@ -452,7 +462,7 @@ class TranslatorGUI:
                 for split in self.splits:
                     if self.target_lang_code != "":
                         tgt_prefix = [[self.target_lang_code]] * len(split)
-                        src_prefix = "__" + self.detected_lang_code + "__"
+                        src_prefix = self.src_prefix
                         start_pos = 7
                         max_batch_size = 1024
                     else:
@@ -512,7 +522,7 @@ if __name__ == "__main__":
     window = tk.Tk()
     window.title("DesktopTranslator")
     window.resizable(True, True)
-    window.state("zoomed")
+    window.state("zoomed")   
 
     # Get the current screen width and height (optional, for Mac)
     screen_width = window.winfo_screenwidth()
