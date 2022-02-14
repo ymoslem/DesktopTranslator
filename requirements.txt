@@ -6,4 +6,5 @@ numpy==1.21.5
 Pmw==2.0.1
 pysbd==0.3.4
 sentencepiece==0.1.96
+sentence-splitter==1.4
 tqdm==4.62.3
