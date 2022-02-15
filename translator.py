@@ -195,7 +195,7 @@ class TranslatorGUI:
             self.toolbar,
             text="418M",
             cursor="hand2",
-            width=4,
+            width=5,
             highlightbackground="white smoke",
             command=self.download_m2m_418m,
         )
@@ -208,7 +208,7 @@ class TranslatorGUI:
             self.toolbar,
             text="1.2B",
             cursor="hand2",
-            width=4,
+            width=5,
             highlightbackground="white smoke",
             command=self.download_m2m_12b,
         )
@@ -402,8 +402,7 @@ class TranslatorGUI:
             if self.m2m and self.combobox.get() == "None":
                 question = askquestion(
                     "M2M Model",
-                    "It seems you selected an M2M-100 model, which requires specifying  the target language.\n\n \
-                        Do you want to stop to select the target language?",
+                    "It seems you selected a multilingual model.\nDo you want to stop to select the target language?",
                 )
                 if question == "yes":
                     return
@@ -412,8 +411,7 @@ class TranslatorGUI:
             elif self.m2m is False and self.combobox.get() != "None":
                 question = askquestion(
                     "Not an M2M Model",
-                    "It seems the model you selected is not an M2M-100 model.\n\n \
-                        Do you want to remove the target language?",
+                    "It seems the model you selected is not an M2M-100 model.\nDo you want to remove the target language?",
                 )
                 if question == "yes":
                     self.combobox.set("None")
@@ -443,7 +441,7 @@ class TranslatorGUI:
 
             self.statusbar.config(text="Translating...")
 
-            self.n_splits = round((len(self.source_sents) / 16) + 0.5)
+            self.n_splits = round((len(self.source_sents) / 8) + 0.5)
             self.splits = array_split(array(self.source_sents), self.n_splits)
             self.splits = [split.tolist() for split in self.splits]
 
@@ -513,7 +511,7 @@ class TranslatorGUI:
         else:
             showerror(
                 "No model selected",
-                "Please select both CTranslate2 and SentencePiece models, and enter text to translate!",
+                "Please select both CTranslate2 and SentencePiece models, and enter text to translate.",
             )
 
 
