@@ -75,7 +75,6 @@ class TranslatorGUI:
         self.statusbar = tk.Label(
             self.main_frame,
             anchor=tk.W,
-            font=("Arial", 12),
             bd=1,
             relief=tk.SUNKEN,
             padx=5,
@@ -318,7 +317,7 @@ class TranslatorGUI:
     def show_info(self):
         showinfo(
             "About",
-            "DesktopTranslator (0.2.1)\n\n\nDeveloped by: Yasmin Moslem\nwww.machinetranslation.io",
+            "DesktopTranslator (0.2.1)\n\nDeveloped by: Yasmin Moslem\nwww.machinetranslation.io",
         )
 
     def open_model(self):
