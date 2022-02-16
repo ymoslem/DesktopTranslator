@@ -383,8 +383,9 @@ class TranslatorGUI:
         )
 
     def detect_language(self, text):
-        pretrained_lang_model = "utils/lid.176.ftz"
-        model = fasttext.load_model(pretrained_lang_model)
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        fasttext_model = os.path.join(dir_path, "utils", "lid.176.ftz")
+        model = fasttext.load_model(fasttext_model)
         text = text[:200].lower() if len(text) > 200 else text.lower()
         prediction = model.predict(text.replace("\n", " "), k=2)
         self.detected_lang_code = prediction[0][0][9:]
