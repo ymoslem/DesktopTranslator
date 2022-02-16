@@ -2,6 +2,7 @@ import pysbd
 from sentence_splitter import split_text_into_sentences
 from indicnlp.tokenize.sentence_tokenize import sentence_split
 
+
 def paragraph_tokenizer(text, language="en"):
     """Replace sentences with their indexes, and store indexes of newlines
     Args:
