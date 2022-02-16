@@ -20,6 +20,7 @@ from utils.paragraph_splitter import paragraph_tokenizer, paragraph_detokenizer
 class TranslatorGUI:
     def __init__(self, window):
         self.window = window
+        self.window.createcommand('tkAboutDialog', self.show_info)  # for macOS
 
         self.main_frame = tk.Frame(self.window)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
@@ -321,7 +322,7 @@ class TranslatorGUI:
         )
 
     def open_model(self):
-        self.toolbar.update()  # for Mac
+        self.toolbar.update()  # for macOS
         self.model_dir = askdirectory()
         if self.model_dir != "":
             # Check if the model is a valid CTranslate2 model
@@ -362,7 +363,7 @@ class TranslatorGUI:
                 )
 
     def open_sp_model(self):
-        self.toolbar.update()  # for Mac
+        self.toolbar.update()  # for macOS
         self.model_file = askopenfile(filetypes=[("SentencePiece Model", "*.model")])
         if self.model_file:
             self.sp_model.set(self.model_file.name)
@@ -370,13 +371,13 @@ class TranslatorGUI:
             self.sp_source_model = spm.SentencePieceProcessor(self.model_file.name)
 
     def download_m2m_418m(self):
-        self.toolbar.update()  # for Mac
+        self.toolbar.update()  # for macOS
         webbrowser.open_new(
             "https://pretrained-nmt-models.s3.us-west-2.amazonaws.com/CTranslate2/m2m100/m2m100_ct2_418m.zip"
         )
 
     def download_m2m_12b(self):
-        self.toolbar.update()  # for Mac
+        self.toolbar.update()  # for macOS
         webbrowser.open_new(
             "https://pretrained-nmt-models.s3.us-west-2.amazonaws.com/CTranslate2/m2m100/m2m100_ct2_12b.zip"
         )
@@ -521,7 +522,7 @@ if __name__ == "__main__":
     window.resizable(True, True)
     window.state("zoomed")   
 
-    # Get the current screen width and height (optional, for Mac)
+    # Get the current screen width and height (optional, for macOS)
     screen_width = window.winfo_screenwidth()
     screen_height = window.winfo_screenheight()
     window.geometry(str(screen_width) + "x" + str(screen_height))
