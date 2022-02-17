@@ -1,4 +1,5 @@
-[![DesktopTranslator](https://img.shields.io/badge/Download-Installer-green)](https://opennmt-gui.s3.us-west-2.amazonaws.com/DesktopTranslator_0.2.0.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer-blue)](https://bit.ly/3sNz8qh)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App-red)](https://bit.ly/3rTS6wa)
 
 # DesktopTranslator
 Local cross-platform machine translation GUI, based on [CTranslate2](https://github.com/OpenNMT/CTranslate2)
@@ -15,10 +16,10 @@ Local cross-platform machine translation GUI, based on [CTranslate2](https://git
 1. [References](#references)
 
     
-## Download Windows Installer
-
-You can either download a ready-made Windows executable installer for DesktopTranslator, or build an installer yourself.  
-[![DesktopTranslator](https://img.shields.io/badge/Download-Installer-green)](https://opennmt-gui.s3.us-west-2.amazonaws.com/DesktopTranslator_0.2.0.exe)
+## Download DesktopTranslator
+   
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer-blue)](https://bit.ly/3sNz8qh)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App-red)](https://bit.ly/3rTS6wa)
 
 <img src="img/installer.png" width="60%">
 
@@ -56,7 +57,9 @@ To use M2M-100 models in DesktopTranslator, please follow these steps:
 8. Click the <kbd>Translate</kbd> button.
 
 
-## [Optional] Build Windows Installer
+## [Optional] Build Stand-alone Executable
+   
+### Build Windows Installer
 
 If you want to adjust the code and then build an installer yourself, you can follow these steps:
 
@@ -88,6 +91,18 @@ SectionEnd
 If you get a permission error while trying to save the edited version of “Modern.nsh”, right-click your text editor (e.g. _Notepad_), and select "Run as administrator". Then, copy the contents of the file into a new file, and save it to the original location.  
 9. Finally, click the NSIS **Generate** button, which will create the ***.exe** installer that can be shipped to other Windows machines, without the need to install any extra requirements.
 10. After installation, if you applied step \#8, you should find an icon on the Desktop. To uninstall, you can simply remove the app folder from "Program Files". For more NSIS options, check this [example](https://nsis.sourceforge.io/A_simple_installer_with_start_menu_shortcut_and_uninstaller).
+
+### Build macOS App
+
+1. Install `py2app`
+```
+pip3 install py2app==0.25
+```
+2. Create a [setup.py](https://gist.github.com/ymoslem/e0c88f30181191d57c374b6cdad9317c) file in the same directory.
+3. Run this command in the Terminal. You can add the option `-A` to test the app first.
+```
+python3 setup.py py2app
+```
 
 
 ## References
