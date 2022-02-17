@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.2.1 (under development)
+
+### Added
+
+- Source language detection
+
+### Fixed
+
+- Sentence splitting for non-Latin languages (Hindi)
+- Source language code as source prefix token
+
+
 ## v0.2.0 (2022-02-07)
 
 ### Added
