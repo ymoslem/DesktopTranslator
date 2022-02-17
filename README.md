@@ -26,7 +26,7 @@ Local cross-platform machine translation GUI, based on [CTranslate2](https://git
 
 ## Translation Models
 
-Currently, DesktopTranslator supports CTranslate2 models, and SentencePiece subwording models (you need both). If you have a model for OpenNMT-py, OpenNMT-tf, or FairSeq, you can convert it to a CTranslate2 format.
+Currently, DesktopTranslator supports CTranslate2 models, and SentencePiece subwording models (you need both). If you have a model for OpenNMT-py, OpenNMT-tf, or FairSeq, you can [convert it to the CTranslate2 format](https://github.com/OpenNMT/CTranslate2#quickstart).
 
 ### French-to-English Generic Model
 
@@ -40,14 +40,14 @@ If you would like to try out the app and you do not have a model, you can downlo
 
 ### M2M-100 Multilingual Model
 
-Now, DesktopTranslator supports **M2M-100** ([Fan et al., 2020](https://arxiv.org/abs/2010.11125)), a multilingual model that can translate between 100 languages.
+Now, DesktopTranslator supports [**M2M-100**](https://github.com/pytorch/fairseq/tree/main/examples/m2m_100) ([Fan et al., 2020](https://arxiv.org/abs/2010.11125)), a multilingual model that can translate between 100 languages.
     
 <kbd> ![DesktopTranslator](img/DesktopTranslator_M2M-100.png)
 
 To use M2M-100 models in DesktopTranslator, please follow these steps:
 1. Download one of the M2M-100 models, converted to the CTranslate2 format:  
-    a. [M2M-100 418M-parameter model](https://pretrained-nmt-models.s3.us-west-2.amazonaws.com/CTranslate2/m2m100/m2m100_ct2_418m.zip); smaller and faster, but sometimes less accurate; or  
-    b. [M2M-100 1.2B-parameter model](https://pretrained-nmt-models.s3.us-west-2.amazonaws.com/CTranslate2/m2m100/m2m100_ct2_12b.zip); bigger and somehow slower, but sometimes more accurate.
+    a. [M2M-100 418M-parameter model](https://bit.ly/33fM1AO); smaller and faster, but sometimes less accurate; or  
+    b. [M2M-100 1.2B-parameter model](https://bit.ly/3GYiaed); bigger and somehow slower, but sometimes more accurate.
 2. Extract the *.zip arhieve of the model you downloaded.
 3. In DesktopTranslator, click the <kbd>CTranslate2 Model</kbd> button, and select the `m2m100_418m` or `m2m100_12b` folder.
 4. Click the <kbd>SentencePiece Model</kbd> button, and from the same model folder, select `sentencepiece.model`.
