@@ -1,7 +1,7 @@
 # Changelog
 
 
-## v0.2.1 (under development)
+## v0.2.1
 
 ### Added
 
@@ -9,7 +9,7 @@
 
 ### Fixed
 
-- Sentence splitting for non-Latin languages (Hindi)
+- Sentence splitting for non-Latin languages
 - Source language code as source prefix token
 
 
