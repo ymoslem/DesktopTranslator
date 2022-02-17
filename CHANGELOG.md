@@ -10,8 +10,8 @@
 
 ### Fixed
 
-- Sentence splitting for non-Latin languages
 - Source language code as source prefix token
+- Sentence splitting for non-Latin languages
 
 
 ## v0.2.0 (2022-02-07)
