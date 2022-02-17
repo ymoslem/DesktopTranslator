@@ -6,6 +6,7 @@
 ### Added
 
 - Source language detection
+- macOS executable app
 
 ### Fixed
 
