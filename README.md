@@ -8,11 +8,13 @@ Local cross-platform machine translation GUI, based on [CTranslate2](https://git
 
 **Table of contents**
 
-1. [Download Windows Installer](#download-windows-installer)
+1. [Download DesktopTranslator](#download-desktoptranslator)
 1. [Translation Models](#translation-models)
     * [French-to-English Generic Model](#french-to-english-generic-model)
     * [M2M-100 Multilingual Model](#m2m-100-multilingual-model)
-1. [[Optional] Build Windows Installer](#optional-build-windows-installer)
+1. [[Optional] Build Stand-alone Executable](#build-stand-alone-executable)
+   * [Build Windows Installer](#build-windows-installer)
+   * [Build macOS App](#build-macos-app)
 1. [References](#references)
 
     
