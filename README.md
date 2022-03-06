@@ -4,7 +4,7 @@
 # DesktopTranslator
 Local cross-platform machine translation GUI, based on [CTranslate2](https://github.com/OpenNMT/CTranslate2)
 
-<kbd> ![DesktopTranslator](img/DesktopTranslator.png)
+![DesktopTranslator](img/DesktopTranslator-NEW.png)
 
 **Table of contents**
 
