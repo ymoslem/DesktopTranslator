@@ -43,7 +43,7 @@ def paragraph_tokenizer(text, language="en"):
 
 
             breaks.extend(
-                list(range(len(sentences), +len(sentences) + len(paragraph_sentences)))
+                list(range(len(sentences), len(sentences) + len(paragraph_sentences)))
             )
             breaks.append("\n")
             sentences.extend(paragraph_sentences)
