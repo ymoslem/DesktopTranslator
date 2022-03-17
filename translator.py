@@ -331,7 +331,7 @@ class TranslatorGUI:
                 shared_vocab_path = os.path.join(self.model_dir, "shared_vocabulary.txt")
                 if os.path.exists(shared_vocab_path):
                     with open(shared_vocab_path, "rb") as vocab_file:
-                        vocab_file.seek(-125, 2)
+                        vocab_file.seek(-300, 2)
                         line = vocab_file.readlines()[-8].decode("utf-8").strip()
                         if "madeupwordforbt" == line:
                             # self.combobox.set("English")
