@@ -119,7 +119,7 @@ class TranslatorGUI:
         # Create the balloon object and bind it to the buttons
         Pmw.initialise(self.window)
         self.balloon = Pmw.Balloon(self.window)
-        self.balloon.bind(self.button_model, "Select CTranslate2 model direcotry")
+        self.balloon.bind(self.button_model, "Select CTranslate2 model directory")
         self.balloon.bind(self.button_sp_model, "Select a SentencePiece source model")
         self.balloon.bind(self.button_translate, "Translate the source text")
         # Change the background colour of the balloon
