@@ -57,6 +57,10 @@ To use M2M-100 models in DesktopTranslator, please follow these steps:
 6. The default <kbd>Beam Size</kbd> is 3. You can increase it to 5, which can be slower, but sometimes results in better translation quality.
 7. In the left input text-area, type some text in any language or your choice of use the <kbd>File</kbd> menu \> <kbd>Open...</kbd> to open a *.txt file.
 8. Click the <kbd>Translate</kbd> button.
+   
+### OPUS Models
+
+OPUS models ([Tatoeba-Challenge](https://github.com/Helsinki-NLP/Tatoeba-Challenge/tree/master/models)) can be used and they can be more efficient. As of now, only _bilingual_ models are supported by DesktopTranslator.
 
 
 ## [Optional] Build Stand-alone Executable
