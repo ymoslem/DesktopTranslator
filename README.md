@@ -60,8 +60,11 @@ To use M2M-100 models in DesktopTranslator, please follow these steps:
    
 ### OPUS Models
 
-OPUS models ([Tatoeba-Challenge](https://github.com/Helsinki-NLP/Tatoeba-Challenge/tree/master/models)) can be used and they can be more efficient. As of now, only _bilingual_ models are supported by DesktopTranslator.
-
+OPUS models ([Tatoeba-Challenge](https://github.com/Helsinki-NLP/Tatoeba-Challenge/tree/master/models)) can be used and they can be more efficient. As of now, only _bilingual_ models are supported by DesktopTranslator. Note: You must convert an OPUS model to the CTranslate2 format first. Example command:
+```
+ct2-opus-mt-converter --model_dir opus_model_dir --output_dir ct2_model_dir --quantization int8
+```
+The source and target tokenization SentencePiece models can be found in the same archive of the downloaded model.
 
 ## [Optional] Build Stand-alone Executable
    
