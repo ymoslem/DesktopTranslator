@@ -50,6 +50,7 @@ jobs:
           pyinstaller -y --windowed --name DesktopTranslatorQt \
             --add-data "utils${{ matrix.separator }}utils" \
             --add-data "img/icon.png${{ matrix.separator }}img" \
+            --add-data "NOTICE.md${{ matrix.separator }}." \
             --icon ${{ matrix.icon }} \
             --collect-data sentence_splitter \
             --collect-data pysbd \

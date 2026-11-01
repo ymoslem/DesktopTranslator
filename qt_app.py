@@ -53,7 +53,9 @@ VERSION = "0.4.0 (development)"
 TARGET_PLACEHOLDER = "Select a language..."
 DEFAULT_TEXT_SIZE = 14
 QUALITY = {"Fast": 2, "Balanced": 3, "Accurate": 5}  # beam sizes
-RELEASES_URL = "https://github.com/ymoslem/DesktopTranslator/releases"
+REPOSITORY_URL = "https://github.com/ymoslem/DesktopTranslator"  # shown in About; a website can be added later
+NOTICE_URL = REPOSITORY_URL + "/blob/main/NOTICE.md"
+RELEASES_URL = REPOSITORY_URL + "/releases"
 DOWNLOADS = [
     ("NLLB-200 distilled 600M", "200 languages; the smallest and fastest",
      "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_distilled_600M_int8_ct2.zip"),
@@ -670,11 +672,10 @@ class Window(QMainWindow):
         QMessageBox.about(
             self, "About " + APP_NAME,
             "<h3>" + APP_NAME + "</h3>Version " + VERSION + "<br>Developed by Yasmin Moslem<br>"
-            "<a href='https://www.machinetranslation.io'>www.machinetranslation.io</a>"
+            "<a href='" + REPOSITORY_URL + "'>github.com/ymoslem/DesktopTranslator</a>"
             "<p>Translation with CTranslate2 and SentencePiece. Released under the MIT license.</p>"
-            "<p>The interface uses Qt for Python (PySide6), available under the "
-            "<a href='https://www.gnu.org/licenses/lgpl-3.0.html'>LGPL v3</a>. "
-            "The source of Qt is at <a href='https://code.qt.io'>code.qt.io</a>.</p>",
+            "<p>Built with Qt for Python (LGPL v3). "
+            "The licenses of all the components are in <a href='" + NOTICE_URL + "'>NOTICE</a>.</p>",
         )
 
     def closeEvent(self, event):
