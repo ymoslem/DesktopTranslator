@@ -258,7 +258,7 @@ class TranslatorGUI:
         self.translatemenu.add_command(label="Translate", command=self.translate_input)
         self.translatemenu.add_separator()
         self.translatemenu.add_command(
-            label="Select CTranslate2 Model", command=self.open_model
+            label="Select CTranslate2 Model Folder", command=self.open_model
         )
         self.translatemenu.add_command(
             label="Select SentencePiece Model", command=self.open_sp_model
@@ -383,7 +383,10 @@ class TranslatorGUI:
 
     def open_model(self):
         self.toolbar.update()  # for macOS
-        model_dir = askdirectory()
+        model_dir = askdirectory(
+            title="Select the CTranslate2 model folder",
+            message="Select the CTranslate2 model folder",  # shown by macOS instead of the title
+        )
         if model_dir != "":
             self.load_model(model_dir)
 
@@ -431,7 +434,10 @@ class TranslatorGUI:
 
     def open_sp_model(self):
         self.toolbar.update()  # for macOS
-        self.model_file = askopenfile(filetypes=[("SentencePiece Model", "*.model")])
+        self.model_file = askopenfile(
+            title="Select the SentencePiece model file",
+            filetypes=[("SentencePiece Model", "*.model")],
+        )
         if self.model_file:
             self.load_sp_model(self.model_file.name)
 
