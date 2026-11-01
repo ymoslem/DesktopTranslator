@@ -434,7 +434,7 @@ class Window(QMainWindow):
         return True
 
     def show_model_name(self, model_dir):
-        self.target_text.setPlaceholderText("The translation appears here")
+        self.target_text.setPlaceholderText("Translation")
         self.model_label.setText("Model: " + short_text(os.path.basename(os.path.normpath(model_dir)), 40))
         self.model_label.setToolTip(model_dir)
 
