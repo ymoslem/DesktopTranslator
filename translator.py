@@ -2,13 +2,15 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter.filedialog import askopenfilename, askopenfile, askdirectory
 from tkinter.filedialog import asksaveasfilename
-from tkinter.messagebox import showinfo, showerror
+from tkinter.messagebox import showinfo, showerror, askyesno
+from tkinter.simpledialog import askstring
 import Pmw
 from datetime import datetime
 import ctranslate2
 import sentencepiece as spm
 from charset_normalizer import from_path
 import fasttext
+import codecs
 import multiprocessing
 import os
 import queue
@@ -17,8 +19,21 @@ import webbrowser
 import json
 from utils.paragraph_splitter import paragraph_tokenizer, paragraph_detokenizer, join_lines
 from utils.model_info import read_vocabulary, detect_model_type
-from utils.rtl import is_rtl_target, add_rtl_marks, strip_bidi_marks
+from utils.rtl import is_rtl_target, is_rtl_language, add_rtl_marks, strip_bidi_marks
 from utils.settings import load_settings, save_settings
+
+
+AUTO_DETECT = "Auto detect"
+TARGET_PLACEHOLDER = "Select a language..."
+LONG_LINE_CHARS = 100000  # Tk takes minutes to display a single line much longer than this
+
+
+def format_duration(seconds):
+    if seconds < 90:
+        return str(max(int(round(seconds)), 1)) + " s"
+    if seconds < 5400:
+        return str(int(round(seconds / 60))) + " min"
+    return str(round(seconds / 3600, 1)) + " h"
 
 
 class TranslatorGUI:
@@ -38,6 +53,7 @@ class TranslatorGUI:
         self.beam_size.set(3)
 
         self.settings = load_settings()
+        self.target_memory = dict(self.settings.get("target_language", {}))
         self.remember_paths = tk.BooleanVar(
             self.main_frame, value=self.settings.get("remember_model_paths", True)
         )
@@ -48,6 +64,9 @@ class TranslatorGUI:
             self.main_frame, value=self.settings.get("rtl_view", True)
         )
         self.translation = ""  # the translation without direction marks
+        self.lid_model = None  # the fastText language identification model, loaded once
+        self.source_rtl = False
+        self.file_name = ""
         self.target_is_rtl = False
         self.translator = None
         self.sp_source_model = None
@@ -81,16 +100,27 @@ class TranslatorGUI:
         )
         self.source_text.grid(row=2, column=0, sticky="nsew")
         self.source_text.focus_set()
+        self.source_text.tag_configure("rtl", justify="right")
+        self.source_text.bind("<KeyRelease>", self.keep_source_direction)
 
         # Create the headers above the text areas
         self.source_header = tk.Label(
             self.main_frame, text="Source", anchor=tk.W, padx=7, bg="white smoke"
         )
         self.source_header.grid(row=1, column=0, sticky="nsew")
+        self.target_header_frame = tk.Frame(self.main_frame, bg="white smoke")
+        self.target_header_frame.grid(row=1, column=1, sticky="nsew")
         self.target_header = tk.Label(
-            self.main_frame, text="Translation", anchor=tk.W, padx=7, bg="white smoke"
+            self.target_header_frame, text="Translation", anchor=tk.W, padx=7, bg="white smoke"
         )
-        self.target_header.grid(row=1, column=1, sticky="nsew")
+        self.target_header.pack(side=tk.LEFT)
+        self.button_copy = tk.Button(
+            self.target_header_frame,
+            text="Copy",
+            highlightbackground="white smoke",
+            command=self.copy_all_translation,
+        )
+        self.button_copy.pack(side=tk.RIGHT, padx=2)
 
         # Create the target text input
         self.target_text = tk.Text(
@@ -108,6 +138,11 @@ class TranslatorGUI:
         self.target_text.grid(row=2, column=1, sticky="nsew")
         self.target_text.tag_configure("rtl", justify="right")
         self.target_text.bind("<<Copy>>", self.copy_translation)
+        # Clicks and selections make Tk re-flow a right-to-left line, so they are blocked in that view
+        self.target_locked = False
+        for sequence in ("<Button-1>", "<B1-Motion>", "<Double-Button-1>", "<Triple-Button-1>",
+                         "<Shift-Button-1>", "<ButtonRelease-1>", "<<SelectAll>>"):
+            self.target_text.bind(sequence, self.block_if_locked)
 
         # Create the statusbar, the progress bar, and the loaded model label
         self.statusframe = tk.Frame(self.main_frame, bd=1, relief=tk.SUNKEN, bg="white smoke")
@@ -203,12 +238,27 @@ class TranslatorGUI:
         separator = ttk.Separator(self.toolbar, orient="vertical")
         separator.pack(side=tk.LEFT, fill=tk.Y)
 
+        self.source_label = tk.Label(
+            self.toolbar,
+            text="Source language:",
+            bg="white smoke",
+        )
+        self.source_label.pack(side=tk.LEFT, padx=2, pady=2)
+
+        # Create the source language selection combobox
+        self.source_combobox = ttk.Combobox(
+            self.toolbar, values=[AUTO_DETECT], state="disabled", width=20
+        )
+        self.source_combobox.set(AUTO_DETECT)
+        self.source_combobox.pack(side=tk.LEFT, padx=2, pady=2, fill=tk.BOTH)
+        self.source_combobox.bind("<<ComboboxSelected>>", self.on_source_selected)
+
         self.target_label = tk.Label(
             self.toolbar,
             text="Target language:",
             bg="white smoke",
         )
-        self.target_label.pack(side=tk.LEFT, padx=2, pady=2)
+        self.target_label.pack(side=tk.LEFT, padx=(10, 2), pady=2)
 
         # Load the JSON files containing the languages supported by the multilingual models
         dir_path = os.path.dirname(os.path.realpath(__file__))
@@ -220,15 +270,23 @@ class TranslatorGUI:
         json_file = os.path.join(dir_path, "utils", "fasttext_to_flores.json")
         with open(json_file, encoding="utf-8") as codes_file:
             self.fasttext_to_flores = json.load(codes_file)
+        self.flores_to_fasttext = {v: k for k, v in self.fasttext_to_flores.items()}
         self.language_codes = {}
 
         # Create the target language selection combobox
-        self.combobox = ttk.Combobox(self.toolbar, values=["None"], state="disabled", width=24)
+        self.combobox = ttk.Combobox(
+            self.toolbar, values=["Load a model first"], state="disabled", width=20
+        )
         self.combobox.pack(side=tk.LEFT, padx=2, pady=2, fill=tk.BOTH)
         self.combobox.current(0)
+        self.combobox.bind("<<ComboboxSelected>>", self.on_target_selected)
         self.balloon.bind(
             self.combobox,
             "For the multilingual models (M2M-100 and NLLB-200), select the target language",
+        )
+        self.balloon.bind(
+            self.source_combobox,
+            "For the multilingual models, select the source language, or keep Auto detect",
         )
 
     def createMenu(self):
@@ -236,6 +294,9 @@ class TranslatorGUI:
         self.menubar = tk.Menu(self.window)
         self.filemenu = tk.Menu(self.menubar, tearoff=0)
         self.filemenu.add_command(label="Open File...", command=self.open_file)
+        self.filemenu.add_command(
+            label="Reopen File with Encoding...", command=self.reopen_with_encoding
+        )
         self.filemenu.add_command(label="Save Translation...", command=self.save_file)
         self.filemenu.add_separator()
         self.filemenu.add_command(label="Exit", command=window.quit)
@@ -276,7 +337,7 @@ class TranslatorGUI:
             command=self.toggle_rtl_view,
         )
         self.translatemenu.add_checkbutton(
-            label="Remember Model Paths",
+            label="Remember Last Model and Language",
             variable=self.remember_paths,
             command=self.store_settings,
         )
@@ -314,11 +375,39 @@ class TranslatorGUI:
         except:
             pass
 
+    def confirm_long_lines(self, text):
+        """Ask before showing a very long line, which can freeze the text area for minutes"""
+        longest = max((len(line) for line in text.splitlines()), default=0)
+        if longest <= LONG_LINE_CHARS:
+            return True
+        return askyesno(
+            "Very long line",
+            "The text has a line of " + format(longest, ",") + " characters. "
+            "Showing it can take minutes, and the window may not respond meanwhile. "
+            "Adding line breaks, for example after sentences, makes it much faster.\n\n"
+            "Show it anyway?",
+        )
+
     def paste(self):
-        self.source_text.insert(tk.INSERT, self.source_text.clipboard_get())
+        text = self.source_text.clipboard_get()
+        if not self.confirm_long_lines(text):
+            return
+        self.source_text.insert(tk.INSERT, text)
 
         self.line_count = len(self.source_text.get(1.0, tk.END).splitlines())
         self.statusbar.config(text="Lines: " + str(self.line_count))
+        self.update_source_direction()
+
+    def block_if_locked(self, event=None):
+        return "break" if self.target_locked else None
+
+    def copy_all_translation(self):
+        if self.translation == "":
+            self.statusbar.config(text="Nothing to copy.")
+            return
+        self.target_text.clipboard_clear()
+        self.target_text.clipboard_append(self.translation)
+        self.statusbar.config(text="Translation copied to the clipboard.")
 
     def copy_translation(self, event=None):
         try:
@@ -335,34 +424,109 @@ class TranslatorGUI:
         self.source_text.see(tk.INSERT)
 
     def open_file(self):
-        self.file_name = askopenfilename(filetypes=[("Text Files", "*.txt")])
-        if self.file_name:
-            self.source_text.delete(1.0, tk.END)
+        file_name = askopenfilename(filetypes=[("Text Files", "*.txt")])
+        if file_name:
+            self.read_file(file_name)
 
-            self.source_file_text = str(from_path(self.file_name).best())
-            self.source_text.insert(tk.INSERT, self.source_file_text)
+    def reopen_with_encoding(self):
+        if self.file_name == "":
+            showinfo("Reopen File with Encoding", "Please open a file first.")
+            return
+        encoding = askstring(
+            "Reopen File with Encoding",
+            "Encoding of the file, e.g. utf-8, utf-16, latin-1, cp1252:",
+        )
+        if encoding:
+            self.read_file(self.file_name, encoding.strip())
 
-            self.line_count = len(self.source_text.get(1.0, tk.END).splitlines())
-            lines_count_str = "Lines: " + str(self.line_count)
-            words_count_str = "Words: " + str(len(self.source_file_text.split()))
-            self.statusbar.config(text=lines_count_str + " | " + words_count_str)
+    def read_file(self, file_name, encoding=None):
+        """Show a text file in the source pane; the encoding is guessed unless it is given"""
+        try:
+            if encoding:
+                codecs.lookup(encoding)
+                with open(file_name, encoding=encoding) as text_file:
+                    text = text_file.read()
+            else:
+                try:
+                    with open(file_name, encoding="utf-8-sig") as text_file:
+                        text = text_file.read()
+                    encoding = "utf-8"
+                except UnicodeDecodeError:
+                    match = from_path(file_name).best()
+                    if match is None:
+                        encoding = "cp1252"
+                        with open(file_name, encoding=encoding, errors="replace") as text_file:
+                            text = text_file.read()
+                    else:
+                        text, encoding = str(match), match.encoding
+        except (LookupError, UnicodeError, OSError) as error:
+            showerror("Cannot open the file", str(error))
+            return
+
+        if not self.confirm_long_lines(text):
+            return
+        self.file_name = file_name
+        self.source_text.delete(1.0, tk.END)
+        self.source_text.insert(tk.INSERT, text)
+        self.update_source_direction()
+
+        self.line_count = len(self.source_text.get(1.0, tk.END).splitlines())
+        lines_count_str = "Lines: " + str(self.line_count)
+        words_count_str = "Words: " + str(len(text.split()))
+        self.statusbar.config(
+            text=lines_count_str + " | " + words_count_str + " | Encoding: " + encoding
+        )
 
     def save_file(self):
+        data = strip_bidi_marks(self.target_text.get(1.0, tk.END))
+        if data.strip() == "":
+            showinfo("", "Nothing to save!")
+            return
         self.file = asksaveasfilename(
             filetypes=[("Text Files", "*.txt")], defaultextension=".txt"
         )
-        if self.file is not None:
-            self.data = strip_bidi_marks(self.target_text.get(1.0, tk.END))
-            if len(self.data) > 0:
-                with open(self.file, "w+", encoding="utf-8") as output:
-                    output.write(self.data)
-            else:
-                showinfo("", "Nothing to save!")
+        if self.file:
+            with open(self.file, "w", encoding="utf-8") as output:
+                output.write(data.rstrip() + "\n")
 
     def clear(self):
         self.source_text.delete(1.0, tk.END)
+        self.set_source_direction(False)
+        self.source_header.config(text="Source")
         self.show_translation("")
         self.statusbar.config(text="")
+
+    def set_source_direction(self, rtl):
+        self.source_rtl = rtl
+        self.source_text.tag_remove("rtl", "1.0", tk.END)
+        if rtl:
+            self.source_text.tag_add("rtl", "1.0", tk.END)
+
+    def keep_source_direction(self, event=None):
+        # Lines typed after the first one need the alignment too
+        if self.source_rtl:
+            if self.source_combobox.get() == AUTO_DETECT and self.source_text.get(1.0, tk.END).strip() == "":
+                self.set_source_direction(False)
+            else:
+                self.source_text.tag_add("rtl", "1.0", tk.END)
+
+    def on_source_selected(self, event=None):
+        if self.source_combobox.get() == AUTO_DETECT:
+            self.update_source_direction()
+        else:
+            prefix = self.language_codes[self.source_combobox.get()]
+            self.set_source_direction(is_rtl_target(self.model_type, prefix))
+
+    def update_source_direction(self):
+        """Align the source pane from the detected language, when the language is not selected"""
+        text = self.source_text.get(1.0, tk.END)
+        if self.source_combobox.get() != AUTO_DETECT:
+            return
+        if len(text.strip()) > 1:
+            codes = self.detect_language(text)
+            self.set_source_direction(bool(codes) and is_rtl_language(codes[0]))
+        else:
+            self.set_source_direction(False)
 
     def show_info(self):
         showinfo(
@@ -374,12 +538,16 @@ class TranslatorGUI:
         self.settings["remember_model_paths"] = self.remember_paths.get()
         self.settings["join_lines"] = self.join_lines_option.get()
         self.settings["rtl_view"] = self.rtl_view_option.get()
+        if self.model_type in self.language_lists and self.combobox.get() in self.language_codes:
+            self.target_memory[self.model_type] = self.combobox.get()
         if self.remember_paths.get():
             self.settings["ct2_model"] = self.model.get()
             self.settings["sp_model"] = self.sp_model.get()
+            self.settings["target_language"] = self.target_memory
         else:
             self.settings.pop("ct2_model", None)
             self.settings.pop("sp_model", None)
+            self.settings.pop("target_language", None)
         save_settings(self.settings)
 
     def restore_model_paths(self):
@@ -393,10 +561,8 @@ class TranslatorGUI:
                 self.sp_model.set(sp_model)
             if self.model.get() != "" or self.sp_model.get() != "":
                 self.statusbar.config(
-                    text="Remembered models: "
+                    text="Last used model: "
                     + os.path.basename(self.model.get())
-                    + " | "
-                    + os.path.basename(self.sp_model.get())
                     + " (loaded when you click Translate)"
                 )
                 self.show_model_info()
@@ -416,17 +582,25 @@ class TranslatorGUI:
         self.model_type = detect_model_type(self.model_vocabulary)
         if self.model_type in self.language_lists:
             self.language_codes = self.language_lists[self.model_type]
-            self.combobox.config(values=["None"] + sorted(self.language_codes), state="readonly")
+            self.combobox.config(values=sorted(self.language_codes), state="readonly")
+            self.source_combobox.config(values=[AUTO_DETECT] + sorted(self.language_codes), state="readonly")
             if previous_type != self.model_type:
-                self.combobox.set("None")
+                remembered = self.target_memory.get(self.model_type, "") if self.remember_paths.get() else ""
+                self.combobox.set(remembered if remembered in self.language_codes else TARGET_PLACEHOLDER)
+                self.source_combobox.set(AUTO_DETECT)
         else:
             self.language_codes = {}
             self.combobox.config(values=["Not needed"], state="disabled")
             self.combobox.set("Not needed")
+            self.source_combobox.config(values=[AUTO_DETECT], state="disabled")
+            self.source_combobox.set(AUTO_DETECT)
+
+    def on_target_selected(self, event=None):
+        self.store_settings()
 
     def show_model_info(self):
-        names = [os.path.basename(self.model.get()), os.path.basename(self.sp_model.get())]
-        self.model_info.config(text="Model: " + " | ".join(n for n in names if n))
+        # The SentencePiece model belongs to the CTranslate2 model, so only one name is shown
+        self.model_info.config(text="Model: " + os.path.basename(self.model.get()))
 
     def initial_dir(self, directory):
         # The dialogs start in the folder of the last selected model, if it still exists
@@ -507,18 +681,26 @@ class TranslatorGUI:
         )
 
     def detect_language(self, text):
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        fasttext_model = os.path.join(dir_path, "utils", "lid.176.ftz")
-        model = fasttext.load_model(fasttext_model)
+        if self.lid_model is None:
+            dir_path = os.path.dirname(os.path.realpath(__file__))
+            self.lid_model = fasttext.load_model(os.path.join(dir_path, "utils", "lid.176.ftz"))
+        model = self.lid_model
         text = text[:200].lower() if len(text) > 200 else text.lower()
         # model.predict() fails with NumPy 2, so use the underlying call
         prediction = model.f.predict(text.replace("\n", " "), 2, 0.0, "strict")
-        self.detected_lang_code = prediction[0][1][9:]
-        self.detected_lang_code_alt = prediction[1][1][9:]
-        return self.detected_lang_code, self.detected_lang_code_alt
+        # Text with no letters, such as numbers, can give fewer than two languages, or none
+        return [label[9:] for _, label in prediction]
 
     def find_source_language(self, text):
-        """Detect the source language; return its code and the prefix token the model needs"""
+        """Return the source language code and the prefix token the model needs
+
+        The language is the one selected, or else the one detected from the text."""
+        selected = self.source_combobox.get()
+        if selected != AUTO_DETECT and selected in self.language_codes:
+            prefix = self.language_codes[selected]
+            if self.model_type == "m2m":
+                return prefix.strip("_"), prefix
+            return self.flores_to_fasttext.get(prefix, "en"), prefix
         codes = self.detect_language(text)
         if self.model_type == "m2m":
             for code in codes:
@@ -529,7 +711,7 @@ class TranslatorGUI:
                 if code in self.fasttext_to_flores:
                     return code, self.fasttext_to_flores[code]
         else:
-            return codes[0], ""
+            return (codes[0] if codes else "en"), ""
         return None, None
 
     def translate_input(self):
@@ -557,7 +739,7 @@ class TranslatorGUI:
         self.target_lang_code = ""
         if self.model_type in self.language_lists:
             lang_option = self.combobox.get()
-            if lang_option == "None":
+            if lang_option not in self.language_codes:
                 showerror("Target language", "Please select the target language.")
                 return
             self.target_lang_code = self.language_codes[lang_option]
@@ -575,9 +757,17 @@ class TranslatorGUI:
             self.source_text_string
         )
         if self.source_lang_code is None:
-            showerror("", "Source language not supported or not recognized! Try to add more text.")
+            showerror(
+                "Source language",
+                "The source language is not supported or not recognized. Add more text, or select the source language.",
+            )
             return
-        self.source_header.config(text="Source (detected: " + self.source_lang_code + ")")
+        if self.source_combobox.get() == AUTO_DETECT:
+            self.source_header.config(text="Source (detected: " + self.source_lang_code + ")")
+            self.set_source_direction(is_rtl_language(self.source_lang_code))
+        else:
+            self.source_header.config(text="Source")
+            self.set_source_direction(is_rtl_target(self.model_type, self.src_prefix))
 
         source_text = self.source_text_string
         if self.join_lines_option.get():
@@ -609,14 +799,17 @@ class TranslatorGUI:
     def show_translation(self, text):
         """Show the translation; right-to-left languages get direction marks and a read-only pane"""
         self.translation = text
-        self.target_text.config(state=tk.NORMAL)
+        self.target_locked = False
+        self.target_text.config(state=tk.NORMAL, cursor="xterm")
         self.target_text.delete(1.0, tk.END)
         if text == "":
             self.target_text.config(insertwidth=2)
         elif self.target_is_rtl and self.rtl_view_option.get():
             self.target_text.insert(tk.END, add_rtl_marks(text) + "\n", "rtl")
-            # The cursor is hidden because Tk splits a line at the cursor and changes its direction
-            self.target_text.config(state=tk.DISABLED, insertwidth=0)
+            # Tk splits a line at the cursor or at a selection and changes its direction,
+            # so the pane is read-only, with no cursor, and clicks are blocked
+            self.target_locked = True
+            self.target_text.config(state=tk.DISABLED, insertwidth=0, cursor="arrow")
         else:
             self.target_text.insert(tk.END, text + "\n")
             self.target_text.config(insertwidth=2)
@@ -685,7 +878,12 @@ class TranslatorGUI:
                 if kind == "progress":
                     self.progress.config(value=payload)
                     percent = int(100 * payload / self.total_words)
-                    self.statusbar.config(text="Translating... " + str(percent) + "%")
+                    status = "Translating... " + str(percent) + "%"
+                    elapsed = (datetime.now() - self.start).total_seconds()
+                    if payload > 0 and elapsed > 3:
+                        remaining = elapsed * (self.total_words - payload) / payload
+                        status += " (about " + format_duration(remaining) + " left)"
+                    self.statusbar.config(text=status)
                 elif kind == "done":
                     translations_formatted = paragraph_detokenizer(payload, self.breaks)
                     self.show_translation(translations_formatted)
