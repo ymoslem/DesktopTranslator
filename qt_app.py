@@ -66,6 +66,14 @@ DOWNLOADS = [
 ]
 
 
+def short_text(text, limit):
+    """Shorten a long text, such as a path, by leaving out the middle"""
+    if len(text) <= limit:
+        return text
+    head = (limit - 3) // 3
+    return text[:head] + "..." + text[-(limit - 3 - head):]
+
+
 class Worker(QThread):
     """Translates in the background, and reports with signals"""
 
@@ -112,7 +120,7 @@ class LanguageBox(QComboBox):
     def __init__(self):
         super().__init__()
         self.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-        self.setMinimumContentsLength(22)
+        self.setMinimumContentsLength(16)
         self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
 
     def set_languages(self, items, searchable):
@@ -125,6 +133,8 @@ class LanguageBox(QComboBox):
             completer.setFilterMode(Qt.MatchFlag.MatchContains)
             completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
             self.setCompleter(completer)
+        # The list is as wide as its longest name, even if the box is narrower
+        self.view().setMinimumWidth(self.view().sizeHintForColumn(0) + 40)
         self.blockSignals(False)
 
     def choose(self, text):
@@ -189,6 +199,7 @@ class Window(QMainWindow):
         self.translate_button = QPushButton("Translate")
         self.translate_button.setDefault(True)
         self.translate_button.setToolTip("Translate the source text (Ctrl+Return)")
+        self.translate_button.setMinimumWidth(self.translate_button.sizeHint().width() + 8)  # also fits "Cancel"
         self.source_combo, self.target_combo = LanguageBox(), LanguageBox()
         self.swap_button = QPushButton("⇄")
         self.swap_button.setFixedWidth(40)
@@ -388,7 +399,7 @@ class Window(QMainWindow):
         self.engine.load_sp_model(path)
         self.sp_path = path
         self.pending_sp = ""
-        self.statusBar().showMessage("Model loaded: " + self.engine.model_dir)
+        self.statusBar().showMessage("Model loaded: " + short_text(self.engine.model_dir, 70))
         self.save_settings()
 
     def load_model(self, model_dir):
@@ -404,9 +415,13 @@ class Window(QMainWindow):
         if changed:
             self.set_languages(self.engine.model_type)
             self.restore_target()
-        self.model_label.setText("Model: " + os.path.basename(model_dir))
+        self.show_model_name(model_dir)
         self.save_settings()
         return True
+
+    def show_model_name(self, model_dir):
+        self.model_label.setText("Model: " + short_text(os.path.basename(os.path.normpath(model_dir)), 40))
+        self.model_label.setToolTip(model_dir)
 
     def restore_target(self):
         remember = self.preferences.get("remember_model_paths", True)
@@ -431,8 +446,8 @@ class Window(QMainWindow):
             self.set_languages(self.engine.model_type)
             self.restore_target()
             self.pending_model = model_dir
-            self.model_label.setText("Model: " + os.path.basename(model_dir))
-            self.statusBar().showMessage("Last used model: " + os.path.basename(model_dir) + " (loaded when you click Translate)")
+            self.show_model_name(model_dir)
+            self.statusBar().showMessage("Last used model: " + short_text(os.path.basename(model_dir), 50) + " (loaded when you click Translate)")
         if os.path.isfile(sp_path):
             self.pending_sp = sp_path
 
