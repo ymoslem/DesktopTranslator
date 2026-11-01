@@ -89,6 +89,11 @@ class TranslatorGUI:
         # Create the toolbar
         self.toolbar = tk.Frame(self.main_frame, bd=1, bg="white smoke")
         self.toolbar.grid(row=0, column=0, columnspan=2, sticky="nsew")
+        # Two rows keep every control visible on narrow windows
+        self.toolbar_top = tk.Frame(self.toolbar, bg="white smoke")
+        self.toolbar_top.pack(side=tk.TOP, fill=tk.X)
+        self.toolbar_bottom = tk.Frame(self.toolbar, bg="white smoke")
+        self.toolbar_bottom.pack(side=tk.TOP, fill=tk.X)
 
         # Create the source text input
         self.source_text = tk.Text(
@@ -170,7 +175,7 @@ class TranslatorGUI:
 
         # Create the select CTranslate2 model button
         self.button_model = tk.Button(
-            self.toolbar,
+            self.toolbar_top,
             text="CTranslate2 Model",
             width=20,
             highlightbackground="white smoke",
@@ -180,7 +185,7 @@ class TranslatorGUI:
 
         # Create the select SentencePiece model button
         self.button_sp_model = tk.Button(
-            self.toolbar,
+            self.toolbar_top,
             text="SentencePiece Model",
             width=20,
             highlightbackground="white smoke",
@@ -190,7 +195,7 @@ class TranslatorGUI:
 
         # Create the translate button
         self.button_translate = tk.Button(
-            self.toolbar,
+            self.toolbar_top,
             text="Translate",
             width=20,
             highlightbackground="white smoke",
@@ -209,7 +214,7 @@ class TranslatorGUI:
         self.lbl.config(background="white", padx=1, pady=1)
 
         # Create the beam_size label and radio buttons
-        self.labelframe = tk.LabelFrame(self.toolbar, bd=0, bg="white smoke")
+        self.labelframe = tk.LabelFrame(self.toolbar_top, bd=0, bg="white smoke")
         self.labelframe.pack(side=tk.LEFT, padx=10)
 
         self.beam_size_label = tk.Label(
@@ -240,11 +245,8 @@ class TranslatorGUI:
             selectforeground="black",
         )
 
-        separator = ttk.Separator(self.toolbar, orient="vertical")
-        separator.pack(side=tk.LEFT, fill=tk.Y)
-
         self.source_label = tk.Label(
-            self.toolbar,
+            self.toolbar_bottom,
             text="Source language:",
             bg="white smoke",
         )
@@ -252,14 +254,14 @@ class TranslatorGUI:
 
         # Create the source language selection combobox
         self.source_combobox = ttk.Combobox(
-            self.toolbar, values=[AUTO_DETECT], state="disabled", width=20
+            self.toolbar_bottom, values=[AUTO_DETECT], state="disabled", width=20
         )
         self.source_combobox.set(AUTO_DETECT)
         self.source_combobox.pack(side=tk.LEFT, padx=2, pady=2, fill=tk.BOTH)
         self.source_combobox.bind("<<ComboboxSelected>>", self.on_source_selected)
 
         self.target_label = tk.Label(
-            self.toolbar,
+            self.toolbar_bottom,
             text="Target language:",
             bg="white smoke",
         )
@@ -280,7 +282,7 @@ class TranslatorGUI:
 
         # Create the target language selection combobox
         self.combobox = ttk.Combobox(
-            self.toolbar, values=["Load a model first"], state="disabled", width=20
+            self.toolbar_bottom, values=["Load a model first"], state="disabled", width=20
         )
         self.combobox.pack(side=tk.LEFT, padx=2, pady=2, fill=tk.BOTH)
         self.combobox.current(0)
