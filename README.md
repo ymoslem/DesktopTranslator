@@ -1,5 +1,5 @@
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.3.0-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/DesktopTranslator_Windows_0.3.0.exe)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.3.0-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/DesktopTranslator_macOS_0.3.0.zip)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.3.1-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.1/DesktopTranslator_Windows_0.3.1.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.3.1-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.1/DesktopTranslator_macOS_0.3.1.zip)
 
 # DesktopTranslator
 Local cross-platform machine translation GUI, based on [CTranslate2](https://github.com/OpenNMT/CTranslate2)
@@ -22,8 +22,8 @@ Local cross-platform machine translation GUI, based on [CTranslate2](https://git
     
 ## Download DesktopTranslator
    
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.3.0-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/DesktopTranslator_Windows_0.3.0.exe)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.3.0-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/DesktopTranslator_macOS_0.3.0.zip)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.3.1-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.1/DesktopTranslator_Windows_0.3.1.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.3.1-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.1/DesktopTranslator_macOS_0.3.1.zip)
 
 <img src="img/installer.png" width="60%">
 
@@ -116,7 +116,7 @@ pyinstaller -y --windowed --name DesktopTranslator --add-data "utils;utils" --co
 3. Try the `*.exe` file under "dist\DesktopTranslator" to make sure it works.
 4. Download and install [NSIS](https://nsis.sourceforge.io/Download), and then create the installer with the script [installer.nsi](installer.nsi). It installs the app to "Program Files", and adds Start menu and Desktop shortcuts and an uninstaller.
 ```
-makensis /DVERSION=0.3.0 installer.nsi
+makensis /DVERSION=0.3.1 installer.nsi
 ```
 
 If you prefer to create the installer with the NSIS graphical interface, you can follow these steps instead of step 4:
