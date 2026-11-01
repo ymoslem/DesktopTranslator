@@ -1,5 +1,5 @@
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer-blue)](https://bit.ly/3sNz8qh)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App-red)](https://bit.ly/3rTS6wa)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.2.6-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.6/DesktopTranslator_Windows_0.2.6.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.2.6-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.6/DesktopTranslator_macOS_0.2.6.zip)
 
 # DesktopTranslator
 Local cross-platform machine translation GUI, based on [CTranslate2](https://github.com/OpenNMT/CTranslate2)
@@ -20,10 +20,12 @@ Local cross-platform machine translation GUI, based on [CTranslate2](https://git
     
 ## Download DesktopTranslator
    
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer-blue)](https://bit.ly/3sNz8qh)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App-red)](https://bit.ly/3rTS6wa)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.2.6-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.6/DesktopTranslator_Windows_0.2.6.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.2.6-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.6/DesktopTranslator_macOS_0.2.6.zip)
 
 <img src="img/installer.png" width="60%">
+
+The installers are not signed. On macOS (Apple Silicon), open **System Settings** > **Privacy & Security** and click **Open Anyway** the first time you launch the app. On Windows, SmartScreen may show a warning; click **More info** > **Run anyway**.
 
 
 ## Translation Models
@@ -67,6 +69,8 @@ ct2-opus-mt-converter --model_dir opus_model_dir --output_dir ct2_model_dir --qu
 The source and target tokenization SentencePiece models can be found in the same archive of the downloaded model.
 
 ## [Optional] Build Stand-alone Executable
+
+The installers are built automatically with the [GitHub Actions workflow](.github/workflows/build.yml), which uses PyInstaller on both platforms, and [installer.nsi](installer.nsi) for the Windows installer. To build them yourself, you can follow the steps below.
    
 ### Build Windows Installer
 
