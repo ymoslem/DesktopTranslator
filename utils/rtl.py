@@ -6,9 +6,12 @@ M2M_RTL_CODES = {"__ar__", "__fa__", "__ur__", "__he__", "__ps__", "__sd__", "__
 # Scripts of the NLLB-200 language codes, e.g. arb_Arab, that are written from right to left
 NLLB_RTL_SCRIPTS = {"Arab", "Hebr"}
 
-RLE = "‫"  # right-to-left embedding
-PDF = "‬"  # pop directional formatting
-BIDI_MARKS = re.compile("[‎‏‪-‮]")
+# Languages known to fastText that are written from right to left
+FASTTEXT_RTL_CODES = {"ar", "arz", "azb", "ckb", "dv", "fa", "he", "ps", "pnb", "sd", "ug", "ur", "yi"}
+
+RLE = "\u202b"  # right-to-left embedding
+PDF = "\u202c"  # pop directional formatting
+BIDI_MARKS = re.compile("[\u200e\u200f\u202a-\u202e]")
 
 
 def is_rtl_target(model_type, target_lang_code):
@@ -26,6 +29,11 @@ def is_rtl_target(model_type, target_lang_code):
     if model_type == "nllb":
         return target_lang_code.split("_")[-1] in NLLB_RTL_SCRIPTS
     return False
+
+
+def is_rtl_language(fasttext_code):
+    """Tell if a language detected by fastText is written from right to left"""
+    return fasttext_code in FASTTEXT_RTL_CODES
 
 
 def add_rtl_marks(text):
