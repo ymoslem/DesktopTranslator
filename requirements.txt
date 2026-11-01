@@ -1,6 +1,6 @@
 charset-normalizer==3.5.2
 ctranslate2==4.8.4
-fasttext==0.9.3
+fasttext-wheel==0.9.2
 indic-nlp-library==0.92
 numpy==2.4.6
 pandas==3.1.0
