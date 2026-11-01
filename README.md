@@ -64,10 +64,13 @@ To use M2M-100 models in DesktopTranslator, please follow these steps:
 ### NLLB-200 Multilingual Model
 
 DesktopTranslator also supports [**NLLB-200**](https://arxiv.org/abs/2207.04672) ([NLLB Team et al., 2022](https://arxiv.org/abs/2207.04672)), a multilingual model that can translate between 200 languages. To use it, please follow these steps:
-1. Download the [NLLB-200 distilled 600M-parameter model](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_distilled_600M_int8_ct2.zip), converted to the CTranslate2 format with int8 quantization. You can also use the <kbd>Help</kbd> menu \> <kbd>Download NLLB-200 600M Model</kbd>.
+1. Download one of the NLLB-200 models, converted to the CTranslate2 format with int8 quantization:  
+    a. [NLLB-200 distilled 600M-parameter model](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_distilled_600M_int8_ct2.zip); the smallest and fastest, and good for most uses. You can also use the <kbd>Help</kbd> menu \> <kbd>Download NLLB-200 600M Model</kbd>; or  
+    b. [NLLB-200 distilled 1.2B-parameter model](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_distilled_1.2B_int8_ct2.zip); slower and needs more memory, but sometimes more accurate; or  
+    c. [NLLB-200 3.3B-parameter model](https://pretrained-nmt-models.s3.us-west-004.backblazeb2.com/CTranslate2/nllb/nllb-200_3.3B_int8_ct2.zip) (3.1 GB); the largest, slowest, and needs the most memory. This archive does not include a SentencePiece model, so also download [NLLB-200_sentencepiece.model](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_sentencepiece.model).
 2. Extract the *.zip archive.
-3. In DesktopTranslator, click the <kbd>CTranslate2 Model</kbd> button, and select the `nllb-200-distilled-600M-int8` folder.
-4. Click the <kbd>SentencePiece Model</kbd> button, and from the same folder, select `sentencepiece.model`.
+3. In DesktopTranslator, click the <kbd>CTranslate2 Model</kbd> button, and select the model folder, for example `nllb-200-distilled-600M-int8`.
+4. Click the <kbd>SentencePiece Model</kbd> button, and from the same folder, select `sentencepiece.model`. For the 3.3B model, select the `NLLB-200_sentencepiece.model` file you downloaded.
 5. From the <kbd>Target language</kbd> dropdown list, select the language to which you want to translate. Language varieties are grouped, for example "Arabic (Modern Standard)" and "Arabic (Egyptian)". The source language is detected automatically; to choose it yourself, use the dropdown list above the source text.
 6. For right-to-left target languages such as Arabic, Persian, Urdu, and Hebrew, the translation is displayed right to left in a read-only pane, because the text widget cannot edit or select right-to-left lines correctly. Use the <kbd>Copy</kbd> button above the pane to copy the translation. To edit it, clear <kbd>Translate</kbd> menu \> <kbd>Right-to-Left View</kbd>.
 7. Click the <kbd>Translate</kbd> button. You can click <kbd>Cancel</kbd> to stop a long translation.

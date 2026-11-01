@@ -5,7 +5,7 @@
 
 ### Added
 
-- Support for NLLB-200 models (NLLB Team et al., 2022), with a package of the 600M model and its SentencePiece model
+- Support for NLLB-200 models (NLLB Team et al., 2022), with packages of the 600M and 1.2B models and their SentencePiece model
 - Translation runs in the background, with a progress bar and a Cancel button
 - Right-to-left view for right-to-left target languages, with an option to switch it off
 - Copy button above the translation
