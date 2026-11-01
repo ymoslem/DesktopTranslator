@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.2.4
+
+### Added
+
+- Option to remember the CTranslate2 and SentencePiece model paths
+- Option to join single line breaks within paragraphs
+
+### Fixed
+
+- Stray token at the start of translations for models without a language prefix
+
+
 ## v0.2.3
 
 ### Changed
@@ -18,7 +30,7 @@
 
 ### Added
 
-- NLLB-200 600M model download
+- NLLB-200 600M CTranslate2 model file (not yet supported by the app)
 
 
 ## v0.2.1
