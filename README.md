@@ -1,5 +1,5 @@
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.3.1-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.1/DesktopTranslator_Windows_0.3.1.exe)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.3.1-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.1/DesktopTranslator_macOS_0.3.1.zip)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.3.0-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/DesktopTranslator_Windows_0.3.0.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.3.0-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/DesktopTranslator_macOS_0.3.0.zip)
 
 # DesktopTranslator
 Local cross-platform machine translation GUI, based on [CTranslate2](https://github.com/OpenNMT/CTranslate2)
@@ -21,8 +21,8 @@ Local cross-platform machine translation GUI, based on [CTranslate2](https://git
     
 ## Download DesktopTranslator
    
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.3.1-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.1/DesktopTranslator_Windows_0.3.1.exe)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.3.1-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.1/DesktopTranslator_macOS_0.3.1.zip)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.3.0-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/DesktopTranslator_Windows_0.3.0.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.3.0-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/DesktopTranslator_macOS_0.3.0.zip)
 
 <img src="img/installer.png" width="60%">
 
@@ -64,7 +64,7 @@ To use M2M-100 models in DesktopTranslator, please follow these steps:
 ### NLLB-200 Multilingual Model
 
 DesktopTranslator also supports [**NLLB-200**](https://arxiv.org/abs/2207.04672) ([NLLB Team et al., 2022](https://arxiv.org/abs/2207.04672)), a multilingual model that can translate between 200 languages. To use it, please follow these steps:
-1. Download the [NLLB-200 distilled 600M-parameter model](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.1/NLLB-200_distilled_600M_int8_ct2.zip), converted to the CTranslate2 format with int8 quantization. You can also use the <kbd>Help</kbd> menu \> <kbd>Download NLLB-200 600M Model</kbd>.
+1. Download the [NLLB-200 distilled 600M-parameter model](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_distilled_600M_int8_ct2.zip), converted to the CTranslate2 format with int8 quantization. You can also use the <kbd>Help</kbd> menu \> <kbd>Download NLLB-200 600M Model</kbd>.
 2. Extract the *.zip archive.
 3. In DesktopTranslator, click the <kbd>CTranslate2 Model</kbd> button, and select the `nllb-200-distilled-600M-int8` folder.
 4. Click the <kbd>SentencePiece Model</kbd> button, and from the same folder, select `sentencepiece.model`.

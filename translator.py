@@ -367,7 +367,7 @@ class TranslatorGUI:
     def show_info(self):
         showinfo(
             "About",
-            "DesktopTranslator (0.3.1)\n\nDeveloped by: Yasmin Moslem\nwww.machinetranslation.io",
+            "DesktopTranslator (0.3.0)\n\nDeveloped by: Yasmin Moslem\nwww.machinetranslation.io",
         )
 
     def store_settings(self):
@@ -491,7 +491,7 @@ class TranslatorGUI:
     def download_nllb_600m(self):
         self.toolbar.update()  # for macOS
         webbrowser.open_new(
-            "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.1/NLLB-200_distilled_600M_int8_ct2.zip"
+            "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_distilled_600M_int8_ct2.zip"
         )
 
     def download_m2m_418m(self):

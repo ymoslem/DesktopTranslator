@@ -1,7 +1,7 @@
 # Changelog
 
 
-## v0.3.1
+## v0.3.0
 
 ### Added
 
@@ -75,7 +75,7 @@
 
 ### Added
 
-- NLLB-200 600M CTranslate2 model file (replaced by a package with its SentencePiece model in v0.3.1)
+- NLLB-200 600M CTranslate2 model file (replaced by a package with its SentencePiece model in v0.3.0)
 
 
 ## v0.2.1
