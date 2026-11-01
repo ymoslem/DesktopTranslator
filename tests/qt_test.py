@@ -148,12 +148,12 @@ window.save_translation()
 check(messages and "nothing to save" in messages[-1][1].lower(), "an empty translation is not saved")
 
 # Cancelling, the progress bar and the time left
-long_text = " ".join(["The committee approved the new budget after a long debate in the main hall."] * 40)
+long_text = " ".join(["The committee approved the new budget after a long debate in the main hall."] * 120)  # long enough to still be translating after 5 seconds
 window.source_text.setPlainText(long_text)
 window.target_combo.choose("French")
 window.translate_or_cancel()
 started, statuses = time.time(), []
-while window.worker is not None and time.time() - started < 6:
+while window.worker is not None and time.time() - started < 5:
     app.processEvents()
     statuses.append(window.status_label.text())
     time.sleep(0.02)
