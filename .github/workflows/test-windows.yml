@@ -34,6 +34,19 @@ jobs:
       - name: Run the smoke test on the source code
         run: python tests/smoke_test.py model/fren
 
+      - name: Start the app from the source code and take a screenshot
+        run: |
+          $process = Start-Process python -ArgumentList "translator.py" -PassThru
+          Start-Sleep -Seconds 15
+          if ($process.HasExited) { Write-Host "The app exited with code $($process.ExitCode)"; exit 1 }
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          $screen = [System.Windows.Forms.SystemInformation]::VirtualScreen
+          $bitmap = New-Object System.Drawing.Bitmap $screen.Width, $screen.Height
+          $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+          $graphics.CopyFromScreen($screen.Left, $screen.Top, 0, 0, $bitmap.Size)
+          $bitmap.Save("screenshot-source.png")
+          Stop-Process -Id $process.Id
+
       - name: Install the installer silently
         run: |
           $installer = Get-ChildItem installer/*.exe | Select-Object -First 1
@@ -66,5 +79,7 @@ jobs:
         if: always()
         with:
           name: windows-screenshot
-          path: screenshot.png
+          path: |
+            screenshot.png
+            screenshot-source.png
           if-no-files-found: ignore
