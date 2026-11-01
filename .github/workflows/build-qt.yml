@@ -52,11 +52,18 @@ jobs:
       - name: Measure the size
         run: |
           python - <<'PY' | tee size-${{ matrix.name }}.txt
-          import os, shutil
-          folder = "dist/DesktopTranslatorQt.app" if os.path.isdir("dist/DesktopTranslatorQt.app") else "dist/DesktopTranslatorQt"
-          total = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(folder) for f in fs)
-          archive = shutil.make_archive("DesktopTranslatorQt", "zip", "dist")
-          print("${{ matrix.name }} Qt build: unpacked %.0f MB, zip %.0f MB" % (total / 1e6, os.path.getsize(archive) / 1e6))
+          import os, shutil, subprocess
+          name = "DesktopTranslatorQt"
+          app = "dist/" + name + ".app"
+          if os.path.isdir(app):
+              # macOS: the app has links that must not be counted twice, so measure it as macOS does
+              unpacked = int(subprocess.check_output(["du", "-sk", app]).split()[0]) * 1024
+              subprocess.check_call(["ditto", "-c", "-k", "--keepParent", app, "measure.zip"])
+              archive = "measure.zip"
+          else:
+              unpacked = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk("dist/" + name) for f in fs)
+              archive = shutil.make_archive("measure", "zip", "dist", name)
+          print("${{ matrix.name }} Qt build: unpacked %.0f MB, zip %.0f MB" % (unpacked / 1e6, os.path.getsize(archive) / 1e6))
           PY
 
       - name: List the biggest files
@@ -131,11 +138,18 @@ jobs:
       - name: Measure the size the same way
         run: |
           python - <<'PY' | tee size-Tk-${{ matrix.name }}.txt
-          import os, shutil
-          folder = "dist/DesktopTranslator.app" if os.path.isdir("dist/DesktopTranslator.app") else "dist/DesktopTranslator"
-          total = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(folder) for f in fs)
-          archive = shutil.make_archive("DesktopTranslator", "zip", "dist")
-          print("${{ matrix.name }} Tk build: unpacked %.0f MB, zip %.0f MB" % (total / 1e6, os.path.getsize(archive) / 1e6))
+          import os, shutil, subprocess
+          name = "DesktopTranslator"
+          app = "dist/" + name + ".app"
+          if os.path.isdir(app):
+              # macOS: the app has links that must not be counted twice, so measure it as macOS does
+              unpacked = int(subprocess.check_output(["du", "-sk", app]).split()[0]) * 1024
+              subprocess.check_call(["ditto", "-c", "-k", "--keepParent", app, "measure.zip"])
+              archive = "measure.zip"
+          else:
+              unpacked = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk("dist/" + name) for f in fs)
+              archive = shutil.make_archive("measure", "zip", "dist", name)
+          print("${{ matrix.name }} Tk build: unpacked %.0f MB, zip %.0f MB" % (unpacked / 1e6, os.path.getsize(archive) / 1e6))
           PY
 
       - uses: actions/upload-artifact@v7
