@@ -318,7 +318,7 @@ class TranslatorGUI:
     def show_info(self):
         showinfo(
             "About",
-            "DesktopTranslator (0.2.1)\n\nDeveloped by: Yasmin Moslem\nwww.machinetranslation.io",
+            "DesktopTranslator (0.2.3)\n\nDeveloped by: Yasmin Moslem\nwww.machinetranslation.io",
         )
 
     def open_model(self):
@@ -373,13 +373,13 @@ class TranslatorGUI:
     def download_m2m_418m(self):
         self.toolbar.update()  # for macOS
         webbrowser.open_new(
-            "https://pretrained-nmt-models.s3.us-west-2.amazonaws.com/CTranslate2/m2m100/m2m100_ct2_418m.zip"
+            "https://pretrained-nmt-models.s3.us-west-004.backblazeb2.com/CTranslate2/m2m100/m2m100_ct2_418m.zip"
         )
 
     def download_m2m_12b(self):
         self.toolbar.update()  # for macOS
         webbrowser.open_new(
-            "https://pretrained-nmt-models.s3.us-west-2.amazonaws.com/CTranslate2/m2m100/m2m100_ct2_12b.zip"
+            "https://pretrained-nmt-models.s3.us-west-004.backblazeb2.com/CTranslate2/m2m100/m2m100_ct2_12b.zip"
         )
 
     def detect_language(self, text):
@@ -387,9 +387,10 @@ class TranslatorGUI:
         fasttext_model = os.path.join(dir_path, "utils", "lid.176.ftz")
         model = fasttext.load_model(fasttext_model)
         text = text[:200].lower() if len(text) > 200 else text.lower()
-        prediction = model.predict(text.replace("\n", " "), k=2)
-        self.detected_lang_code = prediction[0][0][9:]
-        self.detected_lang_code_alt = prediction[0][1][9:]
+        # model.predict() fails with NumPy 2, so use the underlying call
+        prediction = model.f.predict(text.replace("\n", " "), 2, 0.0, "strict")
+        self.detected_lang_code = prediction[0][1][9:]
+        self.detected_lang_code_alt = prediction[1][1][9:]
         return self.detected_lang_code, self.detected_lang_code_alt
 
     def translate_input(self):
@@ -487,7 +488,7 @@ class TranslatorGUI:
                     )
 
                     translations_so_far = [
-                        " ".join(translation[0]["tokens"])
+                        " ".join(translation.hypotheses[0])
                         .replace(" ", "")
                         .replace("▁", " ")[start_pos:]
                         .strip()

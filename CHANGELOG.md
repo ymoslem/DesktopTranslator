@@ -1,6 +1,26 @@
 # Changelog
 
 
+## v0.2.3
+
+### Changed
+
+- Updated dependencies, including CTranslate2 4.8.4 and NumPy 2.x; Python 3.11 or later is required
+
+### Fixed
+
+- Source language detection with NumPy 2
+- Deprecated CTranslate2 result access
+- Broken model download links
+
+
+## v0.2.2 (2023-01-18, pre-release)
+
+### Added
+
+- NLLB-200 600M model download
+
+
 ## v0.2.1
 
 ### Added
