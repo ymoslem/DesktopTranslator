@@ -80,6 +80,11 @@ class TranslatorGUI:
         self.createMenu()
         self.restore_model_paths()
 
+    def text_size(self, points=14):
+        """Size of the text font; Tk 8.6 on macOS counts a point as one pixel, Tk 9 as 4/3 pixels"""
+        scaling = float(self.window.tk.call("tk", "scaling"))
+        return round(points * 4 / 3 / scaling) if scaling < 1.2 else points
+
     def createWidgets(self):
         # Create the toolbar
         self.toolbar = tk.Frame(self.main_frame, bd=1, bg="white smoke")
@@ -89,7 +94,7 @@ class TranslatorGUI:
         self.source_text = tk.Text(
             self.main_frame,
             wrap="word",
-            font=("Arial", 14),
+            font=("Arial", self.text_size()),
             undo=True,
             bd=2,
             relief=tk.SUNKEN,
@@ -126,7 +131,7 @@ class TranslatorGUI:
         self.target_text = tk.Text(
             self.main_frame,
             wrap="word",
-            font=("Arial", 14),
+            font=("Arial", self.text_size()),
             undo=True,
             bd=2,
             relief=tk.SUNKEN,
