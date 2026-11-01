@@ -1,6 +1,17 @@
 # Changelog
 
 
+## v0.2.5
+
+### Added
+
+- Windows and macOS installers, built with GitHub Actions
+
+### Fixed
+
+- Installing dependencies on Windows, Linux, and Intel Macs
+
+
 ## v0.2.4
 
 ### Added
