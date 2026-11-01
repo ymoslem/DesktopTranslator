@@ -87,6 +87,12 @@ class Preferences:
     def remembered_target(self, model_type, remember):
         return self.target_memory.get(model_type, "") if remember else ""
 
+    def set(self, key, value):
+        self.data[key] = value
+
+    def write(self):
+        save_settings(self.data)
+
     def save(self, remember, join_lines_option, rtl_view, ct2_model, sp_model, model_type=None, target=None):
         self.data["remember_model_paths"] = remember
         self.data["join_lines"] = join_lines_option
@@ -101,6 +107,32 @@ class Preferences:
             for key in ("ct2_model", "sp_model", "target_language"):
                 self.data.pop(key, None)
         save_settings(self.data)
+
+
+SENTENCEPIECE_NAMES = ("sentencepiece.model", "sentencepiece.bpe.model", "source.spm", "source.spm.model")
+
+
+def find_sentencepiece(model_dir):
+    """Look for the SentencePiece model of a CTranslate2 model
+
+    It is searched in the model folder, in the folder above it, and in a sp_model folder next to it.
+
+    Returns:
+        candidates (list): Paths of the files found in the first folder that has any; the file with a
+            usual name comes alone, so one path means it can be used without asking
+    """
+    parent = os.path.dirname(os.path.normpath(model_dir))
+    for folder in (model_dir, parent, os.path.join(parent, "sp_model")):
+        if not os.path.isdir(folder):
+            continue
+        files = sorted(os.listdir(folder))
+        for name in SENTENCEPIECE_NAMES:
+            if name in files:
+                return [os.path.join(folder, name)]
+        found = [os.path.join(folder, f) for f in files if f.endswith((".model", ".spm"))]
+        if found:
+            return found
+    return []
 
 
 class Engine:
