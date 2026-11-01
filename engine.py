@@ -15,6 +15,7 @@ from utils.settings import load_settings, save_settings
 
 AUTO_DETECT = "Auto detect"
 LONG_LINE_CHARS = 100000  # a text area takes minutes to display a single line much longer than this
+REPETITION_PENALTY = 1.2  # the optional penalty for repeated words; a penalty of 1.0 is the default, as it scored better
 BATCH_SENTENCES = 8  # sentences translated in one call, so that progress and cancelling stay quick
 
 # The folder with the program files, also when the app is packaged
@@ -87,8 +88,10 @@ class Preferences:
     def remembered_target(self, model_type, remember):
         return self.target_memory.get(model_type, "") if remember else ""
 
-    def save(self, remember, join_lines_option, rtl_view, ct2_model, sp_model, model_type=None, target=None):
+    def save(self, remember, join_lines_option, rtl_view, ct2_model, sp_model, model_type=None, target=None, repetition_penalty=None):
         self.data["remember_model_paths"] = remember
+        if repetition_penalty is not None:
+            self.data["repetition_penalty"] = repetition_penalty
         self.data["join_lines"] = join_lines_option
         self.data["rtl_view"] = rtl_view
         if model_type and target:
@@ -219,7 +222,7 @@ class Engine:
         batches = [sentences[i : i + BATCH_SENTENCES] for i in range(0, len(sentences), BATCH_SENTENCES)]
         return sentences, breaks, batches, max(len(" ".join(sentences).split()), 1)
 
-    def translate_batch(self, batch, beam_size, target_lang_code, src_prefix):
+    def translate_batch(self, batch, beam_size, target_lang_code, src_prefix, repetition_penalty=1.0):
         source_tok = self.sp_model.encode(batch, out_type=str)
         if src_prefix != "":
             source_tok = [[src_prefix] + sent for sent in source_tok]
@@ -233,7 +236,7 @@ class Engine:
             batch_type="tokens",
             max_batch_size=1024 if target_prefix else 2048,
             replace_unknowns=True,
-            repetition_penalty=1.2,
+            repetition_penalty=repetition_penalty,
             target_prefix=target_prefix,
         )
 
@@ -245,14 +248,14 @@ class Engine:
             translations.append("".join(tokens).replace("▁", " ").strip())
         return translations
 
-    def translate(self, batches, beam_size, target_lang_code, src_prefix, is_cancelled=lambda: False, on_progress=None):
+    def translate(self, batches, beam_size, target_lang_code, src_prefix, is_cancelled=lambda: False, on_progress=None, repetition_penalty=1.0):
         """Translate the batches; returns the translated sentences, or None if cancelled"""
         translations = []
         words_done = 0
         for batch in batches:
             if is_cancelled():
                 return None
-            translations.extend(self.translate_batch(batch, beam_size, target_lang_code, src_prefix))
+            translations.extend(self.translate_batch(batch, beam_size, target_lang_code, src_prefix, repetition_penalty))
             words_done += len(" ".join(batch).split())
             if on_progress:
                 on_progress(words_done)

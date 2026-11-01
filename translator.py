@@ -17,6 +17,7 @@ from engine import (
     Engine,
     EngineError,
     Preferences,
+    REPETITION_PENALTY,
     format_duration,
     longest_line,
     read_text_file,
@@ -56,6 +57,9 @@ class TranslatorGUI:
         )
         self.rtl_view_option = tk.BooleanVar(
             self.main_frame, value=self.preferences.get("rtl_view", True)
+        )
+        self.repetition_option = tk.BooleanVar(
+            self.main_frame, value=self.preferences.get("repetition_penalty", 1.0) > 1.0
         )
         self.translation = ""  # the translation without direction marks
         self.source_rtl = False
@@ -344,6 +348,11 @@ class TranslatorGUI:
             command=self.store_settings,
         )
         self.translatemenu.add_checkbutton(
+            label="Avoid Repeated Words",
+            variable=self.repetition_option,
+            command=self.store_settings,
+        )
+        self.translatemenu.add_checkbutton(
             label="Right-to-Left View",
             variable=self.rtl_view_option,
             command=self.toggle_rtl_view,
@@ -534,11 +543,15 @@ class TranslatorGUI:
             remember=self.remember_paths.get(),
             join_lines_option=self.join_lines_option.get(),
             rtl_view=self.rtl_view_option.get(),
+            repetition_penalty=self.repetition_penalty(),
             ct2_model=self.model.get(),
             sp_model=self.sp_model.get(),
             model_type=self.model_type if self.model_type in self.language_lists else None,
             target=self.combobox.get() if self.combobox.get() in self.language_codes else None,
         )
+
+    def repetition_penalty(self):
+        return REPETITION_PENALTY if self.repetition_option.get() else 1.0
 
     def restore_model_paths(self):
         if self.remember_paths.get():
@@ -716,7 +729,7 @@ class TranslatorGUI:
 
         self.worker = threading.Thread(
             target=self.run_translation,
-            args=(self.batches, self.beam_size.get(), self.target_lang_code, self.src_prefix),
+            args=(self.batches, self.beam_size.get(), self.target_lang_code, self.src_prefix, self.repetition_penalty()),
             daemon=True,
         )
         self.worker.start()
@@ -752,7 +765,7 @@ class TranslatorGUI:
         self.cancel_event.set()
         self.statusbar.config(text="Cancelling...")
 
-    def run_translation(self, batches, beam_size, target_lang_code, src_prefix):
+    def run_translation(self, batches, beam_size, target_lang_code, src_prefix, repetition_penalty):
         # Runs in a worker thread, so it must not touch the interface; it reports through a queue
         try:
             translations = self.engine.translate(
@@ -762,6 +775,7 @@ class TranslatorGUI:
                 src_prefix,
                 is_cancelled=self.cancel_event.is_set,
                 on_progress=lambda words_done: self.messages.put(("progress", words_done)),
+                repetition_penalty=repetition_penalty,
             )
             self.messages.put(("cancelled", None) if translations is None else ("done", translations))
         except Exception as error:

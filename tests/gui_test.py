@@ -123,6 +123,22 @@ app.engine.language_codes.pop("Bogus")
 output = run("Le comité a approuvé le nouveau budget après un long débat.", target="English", source="French")
 check("committee approved the new budget" in output.lower() and app.source_header.cget("text") == "Source", "a selected source language is used")
 
+# Repeated words: no penalty by default, and 1.2 as an option
+penalties = []
+real_translate_batch = app.engine.translate_batch
+app.engine.translate_batch = lambda *args, **kw: (penalties.append(args[4] if len(args) > 4 else kw.get("repetition_penalty")), real_translate_batch(*args, **kw))[1]
+run("The committee approved the new budget.", target="French")
+check(penalties and set(penalties) == {1.0}, "no repetition penalty by default: " + str(set(penalties)))
+penalties.clear()
+app.repetition_option.set(True)
+app.store_settings()
+run("The committee approved the new budget.", target="French")
+check(penalties and set(penalties) == {1.2} and json.load(open(SETTINGS_FILE))["repetition_penalty"] == 1.2, "Avoid Repeated Words uses 1.2, and is saved")
+app.repetition_option.set(False)
+app.store_settings()
+check(json.load(open(SETTINGS_FILE))["repetition_penalty"] == 1.0, "switching it off is saved")
+app.engine.translate_batch = real_translate_batch
+
 # Join lines
 text = "The committee met on Monday to discuss the\nnew budget and decided to approve it\nafter a long debate."
 app.join_lines_option.set(True)
