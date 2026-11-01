@@ -1,6 +1,6 @@
 """Draw the app icon: two speech bubbles, one with a Latin and one with an Arabic letter.
 
-Usage: python tools/make_icon.py img/icon.png
+Usage: python tools/make_icon.py img/icon.png [LETTER [FONT]]
 This is a simple starting icon, to be replaced by a designed one.
 """
 import sys
@@ -26,7 +26,7 @@ def bubble(painter, rect, tail_left, fill):
     painter.drawPath(path.united(tail))
 
 
-def main(output):
+def main(output, letter="ع", font_name="Geeza Pro"):
     app = QGuiApplication([])
     image = QImage(SIZE, SIZE, QImage.Format.Format_ARGB32)
     image.fill(Qt.GlobalColor.transparent)
@@ -53,15 +53,15 @@ def main(output):
     font.setPixelSize(280)
     painter.setFont(font)
     painter.drawText(QRectF(140, 190, 360, 380), Qt.AlignmentFlag.AlignCenter, "A")
-    arabic = QFont("Geeza Pro", 1)
+    arabic = QFont(font_name, 1)
     arabic.setPixelSize(300)
     painter.setFont(arabic)
     painter.setPen(QColor("#7c2d12"))
-    painter.drawText(QRectF(400, 400, 470, 380), Qt.AlignmentFlag.AlignCenter, "ع")
+    painter.drawText(QRectF(400, 400, 470, 380), Qt.AlignmentFlag.AlignCenter, letter)
     painter.end()
     image.save(output)
     print("Saved", output)
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(*sys.argv[1:4])
