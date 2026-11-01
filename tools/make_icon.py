@@ -7,7 +7,7 @@ This is a simple starting icon, to be replaced by a designed one.
 import sys
 
 from PySide6.QtCore import QPointF, QRectF, Qt
-from PySide6.QtGui import QColor, QFont, QGuiApplication, QImage, QLinearGradient, QPainter, QPainterPath, QPen
+from PySide6.QtGui import QColor, QFont, QFontMetricsF, QGuiApplication, QImage, QLinearGradient, QPainter, QPainterPath, QPen
 
 SIZE = 1024
 BOLD = True  # the Arabic letter is as heavy as the bold A
@@ -26,6 +26,18 @@ def bubble(painter, rect, tail_left, fill):
     painter.setPen(Qt.PenStyle.NoPen)
     painter.setBrush(fill)
     painter.drawPath(path.united(tail))
+
+
+def draw_letter(painter, font, bold, letter, area, color, size):
+    font.setBold(bold)
+    font.setPixelSize(size)
+    box = QFontMetricsF(font).tightBoundingRect(letter)
+    scale = min(1.0, 0.6 * area.height() / box.height(), 0.7 * area.width() / box.width())
+    font.setPixelSize(int(size * scale))
+    box = QFontMetricsF(font).tightBoundingRect(letter)
+    painter.setFont(font)
+    painter.setPen(color)
+    painter.drawText(QPointF(area.center().x() - box.center().x(), area.center().y() - box.center().y()), letter)
 
 
 def main(output, letter="ع", font_name="Geeza Pro", style=""):
@@ -52,19 +64,9 @@ def main(output, letter="ع", font_name="Geeza Pro", style=""):
     bubble(painter, QRectF(150, 190, 470, 380), True, QColor("#ffffff"))
     bubble(painter, QRectF(400, 400, 470, 380), False, QColor("#fbbf24"))
 
-    # The letters
-    painter.setPen(QColor("#1d4ed8"))
-    font = QFont("Arial", 1)
-    font.setBold(True)
-    font.setPixelSize(280)
-    painter.setFont(font)
-    painter.drawText(QRectF(140, 190, 360, 380), Qt.AlignmentFlag.AlignCenter, "A")
-    arabic = QFont(font_name, 1)
-    arabic.setPixelSize(300)
-    arabic.setBold(BOLD)
-    painter.setFont(arabic)
-    painter.setPen(QColor("#7c2d12"))
-    painter.drawText(QRectF(400, 400, 470, 380), Qt.AlignmentFlag.AlignCenter, letter)
+    # The letters, centred by their outline, and at most 60% of the height of the bubble
+    draw_letter(painter, QFont("Arial", 1), True, "A", QRectF(150, 190, 340, 380), QColor("#1d4ed8"), 280)
+    draw_letter(painter, QFont(font_name, 1), BOLD, letter, QRectF(400, 400, 470, 380), QColor("#7c2d12"), 300)
     painter.end()
     image.save(output)
     print("Saved", output)
