@@ -1,6 +1,28 @@
 # Changelog
 
 
+## v0.3.0
+
+### Added
+
+- Support for NLLB-200 models (NLLB Team et al., 2022), with a package of the 600M model and its SentencePiece model
+- Translation runs in the background, with a progress bar and a Cancel button
+- Right-to-left view for right-to-left target languages, with an option to switch it off
+- Source and translation headers, and the loaded model name in the status bar
+- Model selection dialogs open in the folder of the last selected model
+- Model downloads moved to the Help menu
+
+### Changed
+
+- The target language selector is shared by M2M-100 and NLLB-200, and is disabled for other models
+- NLLB-200 language varieties are listed together, e.g. "Arabic (Modern Standard)"
+- Replaced the progress pop-up window and the `tqdm` dependency
+
+### Fixed
+
+- Detection of M2M-100 models whose vocabulary is stored as `shared_vocabulary.json`
+
+
 ## v0.2.6
 
 ### Changed
@@ -53,7 +75,7 @@
 
 ### Added
 
-- NLLB-200 600M CTranslate2 model file (not yet supported by the app)
+- NLLB-200 600M CTranslate2 model file (replaced by a package with its SentencePiece model in v0.3.0)
 
 
 ## v0.2.1

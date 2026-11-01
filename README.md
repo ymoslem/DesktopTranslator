@@ -1,5 +1,5 @@
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.2.6-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.6/DesktopTranslator_Windows_0.2.6.exe)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.2.6-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.6/DesktopTranslator_macOS_0.2.6.zip)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.3.0-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/DesktopTranslator_Windows_0.3.0.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.3.0-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/DesktopTranslator_macOS_0.3.0.zip)
 
 # DesktopTranslator
 Local cross-platform machine translation GUI, based on [CTranslate2](https://github.com/OpenNMT/CTranslate2)
@@ -12,6 +12,7 @@ Local cross-platform machine translation GUI, based on [CTranslate2](https://git
 1. [Translation Models](#translation-models)
     * [French-to-English Generic Model](#french-to-english-generic-model)
     * [M2M-100 Multilingual Model](#m2m-100-multilingual-model)
+    * [NLLB-200 Multilingual Model](#nllb-200-multilingual-model)
 1. [[Optional] Build Stand-alone Executable](#build-stand-alone-executable)
    * [Build Windows Installer](#build-windows-installer)
    * [Build macOS App](#build-macos-app)
@@ -20,8 +21,8 @@ Local cross-platform machine translation GUI, based on [CTranslate2](https://git
     
 ## Download DesktopTranslator
    
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.2.6-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.6/DesktopTranslator_Windows_0.2.6.exe)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.2.6-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.6/DesktopTranslator_macOS_0.2.6.zip)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.3.0-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/DesktopTranslator_Windows_0.3.0.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.3.0-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/DesktopTranslator_macOS_0.3.0.zip)
 
 <img src="img/installer.png" width="60%">
 
@@ -55,11 +56,22 @@ To use M2M-100 models in DesktopTranslator, please follow these steps:
 2. Extract the *.zip arhieve of the model you downloaded.
 3. In DesktopTranslator, click the <kbd>CTranslate2 Model</kbd> button, and select the `m2m100_418m` or `m2m100_12b` folder.
 4. Click the <kbd>SentencePiece Model</kbd> button, and from the same model folder, select `sentencepiece.model`.
-5. **Important:** From the <kbd>M2M-100</kbd> dropdown list, select the target language to which you want to translate. This step is different between M2M-100 and some other models. M2M-100 models require a language code prefix. For other models that do not require this, keep the "None" option.
+5. **Important:** From the <kbd>Target language</kbd> dropdown list, select the target language to which you want to translate. This step is different between M2M-100 and some other models. M2M-100 models require a language code prefix. For other models that do not require this, keep the "None" option.
 6. The default <kbd>Beam Size</kbd> is 3. You can increase it to 5, which can be slower, but sometimes results in better translation quality.
 7. In the left input text-area, type some text in any language or your choice of use the <kbd>File</kbd> menu \> <kbd>Open...</kbd> to open a *.txt file.
 8. Click the <kbd>Translate</kbd> button.
    
+### NLLB-200 Multilingual Model
+
+DesktopTranslator also supports [**NLLB-200**](https://arxiv.org/abs/2207.04672) ([NLLB Team et al., 2022](https://arxiv.org/abs/2207.04672)), a multilingual model that can translate between 200 languages. To use it, please follow these steps:
+1. Download the [NLLB-200 distilled 600M-parameter model](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_distilled_600M_int8_ct2.zip), converted to the CTranslate2 format with int8 quantization. You can also use the <kbd>Help</kbd> menu \> <kbd>Download NLLB-200 600M Model</kbd>.
+2. Extract the *.zip archive.
+3. In DesktopTranslator, click the <kbd>CTranslate2 Model</kbd> button, and select the `nllb-200-distilled-600M-int8` folder.
+4. Click the <kbd>SentencePiece Model</kbd> button, and from the same folder, select `sentencepiece.model`.
+5. From the <kbd>Target language</kbd> dropdown list, select the language to which you want to translate. Language varieties are grouped, for example "Arabic (Modern Standard)" and "Arabic (Egyptian)". The source language is detected automatically.
+6. For right-to-left target languages such as Arabic, Persian, Urdu, and Hebrew, the translation is displayed right to left in a read-only pane. To edit it, clear <kbd>Translate</kbd> menu \> <kbd>Right-to-Left View</kbd>.
+7. Click the <kbd>Translate</kbd> button. You can click <kbd>Cancel</kbd> to stop a long translation.
+
 ### OPUS Models
 
 OPUS models ([Tatoeba-Challenge](https://github.com/Helsinki-NLP/Tatoeba-Challenge/tree/master/models)) can be used and they can be more efficient. As of now, only _bilingual_ models are supported by DesktopTranslator. Note: You must convert an OPUS model to the CTranslate2 format first. Example command:
@@ -122,3 +134,4 @@ python3 setup.py py2app
 
 * [Efficient and High-Quality Neural Machine Translation with OpenNMT, Klein et al., 2020](https://aclanthology.org/2020.ngt-1.25/)
 * [Beyond English-Centric Multilingual Machine Translation, Fan et al., 2020](https://arxiv.org/abs/2010.11125)
+* [No Language Left Behind: Scaling Human-Centered Machine Translation, NLLB Team et al., 2022](https://arxiv.org/abs/2207.04672)
