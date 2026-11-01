@@ -373,13 +373,13 @@ class TranslatorGUI:
     def download_m2m_418m(self):
         self.toolbar.update()  # for macOS
         webbrowser.open_new(
-            "https://pretrained-nmt-models.s3.us-west-004.backblazeb2.com/CTranslate2/m2m100/m2m100_ct2_418m.zip"
+            "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.1/M2M-100_418m_parameter_model_ct2.zip"
         )
 
     def download_m2m_12b(self):
         self.toolbar.update()  # for macOS
         webbrowser.open_new(
-            "https://pretrained-nmt-models.s3.us-west-004.backblazeb2.com/CTranslate2/m2m100/m2m100_ct2_12b.zip"
+            "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.1/M2M-100_12b_parameter_model_ct2.zip"
         )
 
     def detect_language(self, text):
