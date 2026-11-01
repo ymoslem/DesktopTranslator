@@ -6,40 +6,36 @@ from tkinter.messagebox import showinfo, showerror, askyesno
 from tkinter.simpledialog import askstring
 import Pmw
 from datetime import datetime
-import ctranslate2
-import sentencepiece as spm
-from charset_normalizer import from_path
-import fasttext
-import codecs
 import multiprocessing
 import os
 import queue
 import threading
 import webbrowser
-import json
-from utils.paragraph_splitter import paragraph_tokenizer, paragraph_detokenizer, join_lines
-from utils.model_info import read_vocabulary, detect_model_type
+from engine import (
+    AUTO_DETECT,
+    LONG_LINE_CHARS,
+    Engine,
+    EngineError,
+    Preferences,
+    format_duration,
+    longest_line,
+    read_text_file,
+    write_text_file,
+)
+from utils.paragraph_splitter import paragraph_detokenizer
 from utils.rtl import is_rtl_target, is_rtl_language, add_rtl_marks, strip_bidi_marks
-from utils.settings import load_settings, save_settings
 
 
-AUTO_DETECT = "Auto detect"
 TARGET_PLACEHOLDER = "Select a language..."
-LONG_LINE_CHARS = 100000  # Tk takes minutes to display a single line much longer than this
-
-
-def format_duration(seconds):
-    if seconds < 90:
-        return str(max(int(round(seconds)), 1)) + " s"
-    if seconds < 5400:
-        return str(int(round(seconds / 60))) + " min"
-    return str(round(seconds / 3600, 1)) + " h"
 
 
 class TranslatorGUI:
     def __init__(self, window):
         self.window = window
         self.window.createcommand('tkAboutDialog', self.show_info)  # for macOS
+
+        self.engine = Engine()
+        self.preferences = Preferences()
 
         self.main_frame = tk.Frame(self.window)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
@@ -52,26 +48,19 @@ class TranslatorGUI:
         self.beam_size = tk.IntVar(self.main_frame)
         self.beam_size.set(3)
 
-        self.settings = load_settings()
-        self.target_memory = dict(self.settings.get("target_language", {}))
         self.remember_paths = tk.BooleanVar(
-            self.main_frame, value=self.settings.get("remember_model_paths", True)
+            self.main_frame, value=self.preferences.get("remember_model_paths", True)
         )
         self.join_lines_option = tk.BooleanVar(
-            self.main_frame, value=self.settings.get("join_lines", False)
+            self.main_frame, value=self.preferences.get("join_lines", False)
         )
         self.rtl_view_option = tk.BooleanVar(
-            self.main_frame, value=self.settings.get("rtl_view", True)
+            self.main_frame, value=self.preferences.get("rtl_view", True)
         )
         self.translation = ""  # the translation without direction marks
-        self.lid_model = None  # the fastText language identification model, loaded once
         self.source_rtl = False
         self.file_name = ""
         self.target_is_rtl = False
-        self.translator = None
-        self.sp_source_model = None
-        self.model_type = None  # "m2m", "nllb", "other", or None until a model is selected
-        self.model_vocabulary = set()
         self.worker = None
         self.cancel_event = threading.Event()
         self.messages = queue.Queue()
@@ -79,6 +68,35 @@ class TranslatorGUI:
         self.createWidgets()
         self.createMenu()
         self.restore_model_paths()
+
+    # What the engine knows
+    @property
+    def translator(self):
+        return self.engine.translator
+
+    @property
+    def sp_source_model(self):
+        return self.engine.sp_model
+
+    @property
+    def model_type(self):
+        return self.engine.model_type
+
+    @property
+    def model_vocabulary(self):
+        return self.engine.vocabulary
+
+    @property
+    def language_codes(self):
+        return self.engine.language_codes
+
+    @property
+    def language_lists(self):
+        return self.engine.language_lists
+
+    @property
+    def lid_model(self):
+        return self.engine.lid_model
 
     def text_size(self, points=14):
         """Size of the text font; Tk 8.6 on macOS counts a point as one pixel, Tk 9 as 4/3 pixels"""
@@ -267,19 +285,6 @@ class TranslatorGUI:
         )
         self.target_label.pack(side=tk.LEFT, padx=(10, 2), pady=2)
 
-        # Load the JSON files containing the languages supported by the multilingual models
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        self.language_lists = {}
-        for model_type in ("m2m", "nllb"):
-            json_file = os.path.join(dir_path, "utils", model_type + "_languages.json")
-            with open(json_file, encoding="utf-8") as languages_file:
-                self.language_lists[model_type] = json.load(languages_file)
-        json_file = os.path.join(dir_path, "utils", "fasttext_to_flores.json")
-        with open(json_file, encoding="utf-8") as codes_file:
-            self.fasttext_to_flores = json.load(codes_file)
-        self.flores_to_fasttext = {v: k for k, v in self.fasttext_to_flores.items()}
-        self.language_codes = {}
-
         # Create the target language selection combobox
         self.combobox = ttk.Combobox(
             self.toolbar_bottom, values=["Load a model first"], state="disabled", width=20
@@ -384,7 +389,7 @@ class TranslatorGUI:
 
     def confirm_long_lines(self, text):
         """Ask before showing a very long line, which can freeze the text area for minutes"""
-        longest = max((len(line) for line in text.splitlines()), default=0)
+        longest = longest_line(text)
         if longest <= LONG_LINE_CHARS:
             return True
         return askyesno(
@@ -449,23 +454,7 @@ class TranslatorGUI:
     def read_file(self, file_name, encoding=None):
         """Show a text file in the source pane; the encoding is guessed unless it is given"""
         try:
-            if encoding:
-                codecs.lookup(encoding)
-                with open(file_name, encoding=encoding) as text_file:
-                    text = text_file.read()
-            else:
-                try:
-                    with open(file_name, encoding="utf-8-sig") as text_file:
-                        text = text_file.read()
-                    encoding = "utf-8"
-                except UnicodeDecodeError:
-                    match = from_path(file_name).best()
-                    if match is None:
-                        encoding = "cp1252"
-                        with open(file_name, encoding=encoding, errors="replace") as text_file:
-                            text = text_file.read()
-                    else:
-                        text, encoding = str(match), match.encoding
+            text, encoding = read_text_file(file_name, encoding)
         except (LookupError, UnicodeError, OSError) as error:
             showerror("Cannot open the file", str(error))
             return
@@ -493,8 +482,7 @@ class TranslatorGUI:
             filetypes=[("Text Files", "*.txt")], defaultextension=".txt"
         )
         if self.file:
-            with open(self.file, "w", encoding="utf-8") as output:
-                output.write(data.rstrip() + "\n")
+            write_text_file(self.file, data)
 
     def clear(self):
         self.source_text.delete(1.0, tk.END)
@@ -530,7 +518,7 @@ class TranslatorGUI:
         if self.source_combobox.get() != AUTO_DETECT:
             return
         if len(text.strip()) > 1:
-            codes = self.detect_language(text)
+            codes = self.engine.detect_language(text)
             self.set_source_direction(bool(codes) and is_rtl_language(codes[0]))
         else:
             self.set_source_direction(False)
@@ -542,26 +530,21 @@ class TranslatorGUI:
         )
 
     def store_settings(self):
-        self.settings["remember_model_paths"] = self.remember_paths.get()
-        self.settings["join_lines"] = self.join_lines_option.get()
-        self.settings["rtl_view"] = self.rtl_view_option.get()
-        if self.model_type in self.language_lists and self.combobox.get() in self.language_codes:
-            self.target_memory[self.model_type] = self.combobox.get()
-        if self.remember_paths.get():
-            self.settings["ct2_model"] = self.model.get()
-            self.settings["sp_model"] = self.sp_model.get()
-            self.settings["target_language"] = self.target_memory
-        else:
-            self.settings.pop("ct2_model", None)
-            self.settings.pop("sp_model", None)
-            self.settings.pop("target_language", None)
-        save_settings(self.settings)
+        self.preferences.save(
+            remember=self.remember_paths.get(),
+            join_lines_option=self.join_lines_option.get(),
+            rtl_view=self.rtl_view_option.get(),
+            ct2_model=self.model.get(),
+            sp_model=self.sp_model.get(),
+            model_type=self.model_type if self.model_type in self.language_lists else None,
+            target=self.combobox.get() if self.combobox.get() in self.language_codes else None,
+        )
 
     def restore_model_paths(self):
         if self.remember_paths.get():
-            ct2_model = self.settings.get("ct2_model", "")
-            sp_model = self.settings.get("sp_model", "")
-            if os.path.isdir(ct2_model) and ctranslate2.contains_model(ct2_model):
+            ct2_model = self.preferences.get("ct2_model", "")
+            sp_model = self.preferences.get("sp_model", "")
+            if self.engine.is_model(ct2_model):
                 self.model.set(ct2_model)
                 self.set_model_type(ct2_model)
             if os.path.isfile(sp_model):
@@ -583,20 +566,19 @@ class TranslatorGUI:
             self.load_sp_model(self.sp_model.get())
 
     def set_model_type(self, model_dir):
-        """Adapt the target language selector to the kind of model"""
-        previous_type = self.model_type
-        self.model_vocabulary = read_vocabulary(model_dir)
-        self.model_type = detect_model_type(self.model_vocabulary)
+        """Read the kind of the model, and adapt the language selectors to it"""
+        self.show_model_type(self.engine.inspect_model(model_dir))
+
+    def show_model_type(self, changed):
+        """Adapt the language selectors to the kind of model"""
         if self.model_type in self.language_lists:
-            self.language_codes = self.language_lists[self.model_type]
             self.combobox.config(values=sorted(self.language_codes), state="readonly")
             self.source_combobox.config(values=[AUTO_DETECT] + sorted(self.language_codes), state="readonly")
-            if previous_type != self.model_type:
-                remembered = self.target_memory.get(self.model_type, "") if self.remember_paths.get() else ""
+            if changed:
+                remembered = self.preferences.remembered_target(self.model_type, self.remember_paths.get())
                 self.combobox.set(remembered if remembered in self.language_codes else TARGET_PLACEHOLDER)
                 self.source_combobox.set(AUTO_DETECT)
         else:
-            self.language_codes = {}
             self.combobox.config(values=["Not needed"], state="disabled")
             self.combobox.set("Not needed")
             self.source_combobox.config(values=[AUTO_DETECT], state="disabled")
@@ -624,30 +606,16 @@ class TranslatorGUI:
             self.load_model(model_dir)
 
     def load_model(self, model_dir):
-        self.model_dir = model_dir
-        # Check if the model is a valid CTranslate2 model
-        if not ctranslate2.contains_model(self.model_dir):
-            showerror(
-                "Invalid CTranslate2 model",
-                "Please make sure you select the direcotry of a valid CTranslate2 model!",
-            )
+        try:
+            changed = self.engine.load_model(model_dir)
+        except EngineError as error:
+            showerror(error.title, error.message)
             return False
 
-        self.set_model_type(self.model_dir)
-
-        self.model.set(self.model_dir)
-        self.statusbar.config(text="CT2 Model path: " + self.model_dir)
-
-        self.cpu_num = os.cpu_count()
-        self.inter_threads = 2
-        self.intra_threads = int(self.cpu_num / 2)
-
-        self.translator = ctranslate2.Translator(
-            self.model_dir,
-            device="cpu",
-            inter_threads=self.inter_threads,
-            intra_threads=self.intra_threads,
-        )
+        self.model_dir = model_dir
+        self.show_model_type(changed)
+        self.model.set(model_dir)
+        self.statusbar.config(text="CT2 Model path: " + model_dir)
         self.show_model_info()
         self.store_settings()
         return True
@@ -663,9 +631,9 @@ class TranslatorGUI:
             self.load_sp_model(self.model_file.name)
 
     def load_sp_model(self, sp_model_path):
+        self.engine.load_sp_model(sp_model_path)
         self.sp_model.set(sp_model_path)
         self.statusbar.config(text="SP Model path: " + sp_model_path)
-        self.sp_source_model = spm.SentencePieceProcessor(sp_model_path)
         self.show_model_info()
         self.store_settings()
 
@@ -686,40 +654,6 @@ class TranslatorGUI:
         webbrowser.open_new(
             "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.1/M2M-100_12b_parameter_model_ct2.zip"
         )
-
-    def detect_language(self, text):
-        if self.lid_model is None:
-            dir_path = os.path.dirname(os.path.realpath(__file__))
-            self.lid_model = fasttext.load_model(os.path.join(dir_path, "utils", "lid.176.ftz"))
-        model = self.lid_model
-        text = text[:200].lower() if len(text) > 200 else text.lower()
-        # model.predict() fails with NumPy 2, so use the underlying call
-        prediction = model.f.predict(text.replace("\n", " "), 2, 0.0, "strict")
-        # Text with no letters, such as numbers, can give fewer than two languages, or none
-        return [label[9:] for _, label in prediction]
-
-    def find_source_language(self, text):
-        """Return the source language code and the prefix token the model needs
-
-        The language is the one selected, or else the one detected from the text."""
-        selected = self.source_combobox.get()
-        if selected != AUTO_DETECT and selected in self.language_codes:
-            prefix = self.language_codes[selected]
-            if self.model_type == "m2m":
-                return prefix.strip("_"), prefix
-            return self.flores_to_fasttext.get(prefix, "en"), prefix
-        codes = self.detect_language(text)
-        if self.model_type == "m2m":
-            for code in codes:
-                if "__" + code + "__" in self.language_codes.values():
-                    return code, "__" + code + "__"
-        elif self.model_type == "nllb":
-            for code in codes:
-                if code in self.fasttext_to_flores:
-                    return code, self.fasttext_to_flores[code]
-        else:
-            return (codes[0] if codes else "en"), ""
-        return None, None
 
     def translate_input(self):
         if self.worker is not None:
@@ -743,25 +677,17 @@ class TranslatorGUI:
             return
 
         # Target language, for the multilingual models
-        self.target_lang_code = ""
-        if self.model_type in self.language_lists:
-            lang_option = self.combobox.get()
-            if lang_option not in self.language_codes:
-                showerror("Target language", "Please select the target language.")
-                return
-            self.target_lang_code = self.language_codes[lang_option]
-            if self.target_lang_code not in self.model_vocabulary:
-                showerror(
-                    "Target language",
-                    "This model does not support the target language " + lang_option + ".",
-                )
-                return
+        try:
+            self.target_lang_code = self.engine.target_language(self.combobox.get())
+        except EngineError as error:
+            showerror(error.title, error.message)
+            return
 
         self.target_is_rtl = is_rtl_target(self.model_type, self.target_lang_code)
 
         # Source language
-        self.source_lang_code, self.src_prefix = self.find_source_language(
-            self.source_text_string
+        self.source_lang_code, self.src_prefix = self.engine.source_language(
+            self.source_text_string, self.source_combobox.get()
         )
         if self.source_lang_code is None:
             showerror(
@@ -776,18 +702,11 @@ class TranslatorGUI:
             self.source_header.config(text="Source")
             self.set_source_direction(is_rtl_target(self.model_type, self.src_prefix))
 
-        source_text = self.source_text_string
-        if self.join_lines_option.get():
-            source_text = join_lines(source_text)
-        self.source_sents, self.breaks = paragraph_tokenizer(
-            source_text, self.source_lang_code
+        self.source_sents, self.breaks, self.batches, self.total_words = self.engine.split(
+            self.source_text_string, self.source_lang_code, self.join_lines_option.get()
         )
 
         self.start = datetime.now()
-        self.batches = [
-            self.source_sents[i : i + 8] for i in range(0, len(self.source_sents), 8)
-        ]
-        self.total_words = max(len(" ".join(self.source_sents).split()), 1)
 
         self.progress.config(maximum=self.total_words, value=0)
         self.progress.pack(side=tk.RIGHT, padx=5)
@@ -836,46 +755,17 @@ class TranslatorGUI:
     def run_translation(self, batches, beam_size, target_lang_code, src_prefix):
         # Runs in a worker thread, so it must not touch the interface; it reports through a queue
         try:
-            translations = []
-            words_done = 0
-            for batch in batches:
-                if self.cancel_event.is_set():
-                    self.messages.put(("cancelled", None))
-                    return
-                translations.extend(
-                    self.translate_batch(batch, beam_size, target_lang_code, src_prefix)
-                )
-                words_done += len(" ".join(batch).split())
-                self.messages.put(("progress", words_done))
-            self.messages.put(("done", translations))
+            translations = self.engine.translate(
+                batches,
+                beam_size,
+                target_lang_code,
+                src_prefix,
+                is_cancelled=self.cancel_event.is_set,
+                on_progress=lambda words_done: self.messages.put(("progress", words_done)),
+            )
+            self.messages.put(("cancelled", None) if translations is None else ("done", translations))
         except Exception as error:
             self.messages.put(("error", error))
-
-    def translate_batch(self, batch, beam_size, target_lang_code, src_prefix):
-        source_tok = self.sp_source_model.encode(batch, out_type=str)
-        if src_prefix != "":
-            source_tok = [[src_prefix] + sent for sent in source_tok]
-        if self.model_type == "nllb":
-            source_tok = [sent + ["</s>"] for sent in source_tok]
-
-        target_prefix = [[target_lang_code]] * len(batch) if target_lang_code else None
-        results = self.translator.translate_batch(
-            source=source_tok,
-            beam_size=beam_size,
-            batch_type="tokens",
-            max_batch_size=1024 if target_prefix else 2048,
-            replace_unknowns=True,
-            repetition_penalty=1.2,
-            target_prefix=target_prefix,
-        )
-
-        translations = []
-        for result in results:
-            tokens = result.hypotheses[0]
-            if target_prefix:
-                tokens = tokens[1:]  # the first token is the target language code
-            translations.append("".join(tokens).replace("\u2581", " ").strip())
-        return translations
 
     def poll_translation(self):
         finished = False
