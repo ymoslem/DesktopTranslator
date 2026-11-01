@@ -6,9 +6,13 @@ on:
       tag:
         description: "Release tag whose Windows installer to test, e.g. v0.3.0"
         required: true
+      run_id:
+        description: "Optional ID of an installer workflow run; its Windows installer is tested instead of the release one"
+        required: false
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   windows:
@@ -27,7 +31,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download "${{ inputs.tag }}" --pattern "DesktopTranslator_Windows_*.exe" --dir installer
+          if ("${{ inputs.run_id }}" -ne "") {
+            gh run download "${{ inputs.run_id }}" --name DesktopTranslator-Windows --dir installer
+          } else {
+            gh release download "${{ inputs.tag }}" --pattern "DesktopTranslator_Windows_*.exe" --dir installer
+          }
           gh release download v0.2.3 --pattern "fren.zip" --dir model
           Expand-Archive model/fren.zip -DestinationPath model
 
