@@ -59,6 +59,15 @@ jobs:
           print("${{ matrix.name }} Qt build: unpacked %.0f MB, zip %.0f MB" % (total / 1e6, os.path.getsize(archive) / 1e6))
           PY
 
+      - name: List the biggest files
+        run: |
+          python - <<'PY'
+          import os
+          files = [(os.path.getsize(os.path.join(d, f)), os.path.join(d, f)) for d, _, fs in os.walk("dist") for f in fs]
+          for size, path in sorted(files, reverse=True)[:30]:
+              print("%7.1f MB  %s" % (size / 1e6, path))
+          PY
+
       - name: Download the NLLB-200 model
         env:
           GH_TOKEN: ${{ github.token }}
@@ -83,3 +92,53 @@ jobs:
             size-${{ matrix.name }}.txt
             screenshot-*.png
           if-no-files-found: ignore
+
+  tk-size:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            name: macOS
+            separator: ":"
+          - os: windows-latest
+            name: Windows
+            separator: ";"
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller==6.22.3
+
+      - name: Build the Tk app like the releases
+        run: |
+          pyinstaller -y --windowed --name DesktopTranslator \
+            --add-data "utils${{ matrix.separator }}utils" \
+            --collect-data sentence_splitter \
+            --collect-data pysbd \
+            --collect-all Pmw \
+            --collect-all ctranslate2 \
+            translator.py
+
+      - name: Measure the size the same way
+        run: |
+          python - <<'PY' | tee size-Tk-${{ matrix.name }}.txt
+          import os, shutil
+          folder = "dist/DesktopTranslator.app" if os.path.isdir("dist/DesktopTranslator.app") else "dist/DesktopTranslator"
+          total = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(folder) for f in fs)
+          archive = shutil.make_archive("DesktopTranslator", "zip", "dist")
+          print("${{ matrix.name }} Tk build: unpacked %.0f MB, zip %.0f MB" % (total / 1e6, os.path.getsize(archive) / 1e6))
+          PY
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: tk-${{ matrix.name }}
+          path: size-Tk-${{ matrix.name }}.txt
