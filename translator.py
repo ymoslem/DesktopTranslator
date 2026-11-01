@@ -11,6 +11,7 @@ import ctranslate2
 import sentencepiece as spm
 from charset_normalizer import from_path
 import fasttext
+import multiprocessing
 import os
 import webbrowser
 import json
@@ -588,6 +589,9 @@ class TranslatorGUI:
 
 # Create the root window
 if __name__ == "__main__":
+    # Needed in the stand-alone app, otherwise helper processes start new windows
+    multiprocessing.freeze_support()
+
     window = tk.Tk()
     window.title("DesktopTranslator")
     window.resizable(True, True)
