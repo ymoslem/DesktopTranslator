@@ -53,6 +53,12 @@ jobs:
             --collect-all ctranslate2 \
             translator.py
 
+      - name: Check the bundled data files
+        run: |
+          for file in tr.txt lid.176.ftz nllb_languages.json m2m_languages.json fasttext_to_flores.json; do
+            test -n "$(find dist -name "$file" | head -1)" || { echo "Missing $file in the build"; exit 1; }
+          done
+
       - name: Package for macOS
         if: matrix.name == 'macOS'
         run: |
