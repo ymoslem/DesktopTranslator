@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.3.1
+
+### Changed
+
+- The language selectors are on a second toolbar row, so every control fits narrow windows
+- Added space around the toolbar and the Copy button
+
+### Fixed
+
+- Translated lines no longer end with a space
+
+
 ## v0.3.0
 
 ### Added

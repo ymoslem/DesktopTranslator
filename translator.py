@@ -538,7 +538,7 @@ class TranslatorGUI:
     def show_info(self):
         showinfo(
             "About",
-            "DesktopTranslator (0.3.0)\n\nDeveloped by: Yasmin Moslem\nwww.machinetranslation.io",
+            "DesktopTranslator (0.3.1)\n\nDeveloped by: Yasmin Moslem\nwww.machinetranslation.io",
         )
 
     def store_settings(self):
