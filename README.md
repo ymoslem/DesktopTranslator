@@ -9,6 +9,7 @@ Local cross-platform machine translation GUI, based on [CTranslate2](https://git
 **Table of contents**
 
 1. [Download DesktopTranslator](#download-desktoptranslator)
+1. [Run from Source](#run-from-source)
 1. [Translation Models](#translation-models)
     * [French-to-English Generic Model](#french-to-english-generic-model)
     * [M2M-100 Multilingual Model](#m2m-100-multilingual-model)
@@ -27,6 +28,20 @@ Local cross-platform machine translation GUI, based on [CTranslate2](https://git
 <img src="img/installer.png" width="60%">
 
 The installers are not signed. On macOS (Apple Silicon), open **System Settings** > **Privacy & Security** and click **Open Anyway** the first time you launch the app. On Windows, SmartScreen may show a warning; click **More info** > **Run anyway**.
+
+
+## Run from Source
+
+You need Python 3.11 or later, with Tkinter. The installers from [python.org](https://www.python.org/downloads/) include Tkinter. On Linux, you can install it with your package manager, e.g. `sudo apt install python3-tk`.
+```
+git clone https://github.com/ymoslem/DesktopTranslator.git
+cd DesktopTranslator
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python translator.py
+```
+On Windows, activate the virtual environment with `.venv\Scripts\activate`.
 
 
 ## Translation Models
@@ -91,46 +106,52 @@ The installers are built automatically with the [GitHub Actions workflow](.githu
 
 If you want to adjust the code and then build an installer yourself, you can follow these steps:
 
-1. Install PyInstaller:
+1. Install the requirements and PyInstaller, preferably in a virtual environment.
 ```
-pip3 install pyinstaller
+pip3 install -r requirements.txt pyinstaller==6.22.3
 ```
 
-2. To use PyInstaller, specify the Python file name and the argument -w to hide the console window:
+2. Run PyInstaller. The data folders and the `--collect-data` options are needed, otherwise some languages, such as Turkish, fail to be split into sentences.
 ```
-pyinstaller -y -w "translator.py"
+pyinstaller -y --windowed --name DesktopTranslator --add-data "utils;utils" --collect-data sentence_splitter --collect-data pysbd --collect-all Pmw --collect-all ctranslate2 translator.py
 ```
-If you would like to add an extra folder, e.g. "utils", the command will be:
+3. Try the `*.exe` file under "dist\DesktopTranslator" to make sure it works.
+4. Download and install [NSIS](https://nsis.sourceforge.io/Download), and then create the installer with the script [installer.nsi](installer.nsi). It installs the app to "Program Files", and adds Start menu and Desktop shortcuts and an uninstaller.
 ```
-pyinstaller -y -w --add-data="utils/*;utils/" "translator.py"
+makensis /DVERSION=0.3.0 installer.nsi
 ```
-3. Try the `*.exe` file under "dist\translator" to make sure it works. It might complain about the Pmw library. The solution is either remove the Balloon lines, or add [this file](https://gist.github.com/ymoslem/c4b0cd287c7d5f2b7279dfce354d389b) to the same folder as the `translate.py` and run the aforementioned PyInstaller command again.
-4. Compress the contents of the “dist” directory created by PyInstaller into a *.zip archive. For example, you can find a folder called "translator"; give it the name you like, e.g. "DesktopTranslator", and add it to a *.zip archive.
-5. Download and install [NSIS](https://nsis.sourceforge.io/Download).
-6. Launch NSIS, click **Installer based on a .ZIP file**, and then click **Open** to locate the **\*.zip** archive you have just created.
-7. If you want to make the files installed (extracted) to the “Program Files” of the target user, in the **Default Folder** enter `$PROGRAMFILES`
-8. If you want to add a shortcut to the internal *.exe file on the Desktop after installation, you can add something like this to the file “Modern.nsh” located at: "C:\Program Files\NSIS\Contrib\zip2exe\". Depending on your OS, the path could be at “Program Files (x86)”. Note that the EXE file path should be consistent with the path you selected under NSIS’s “Default Folder” drop-down menu, the folder name, and the EXE file name.
+
+If you prefer to create the installer with the NSIS graphical interface, you can follow these steps instead of step 4:
+
+1. Compress the "DesktopTranslator" folder under "dist" into a *.zip archive.
+2. Launch NSIS, click **Installer based on a .ZIP file**, and then click **Open** to locate the **\*.zip** archive you have just created.
+3. If you want to make the files installed (extracted) to the “Program Files” of the target user, in the **Default Folder** enter `$PROGRAMFILES`
+4. If you want to add a shortcut to the internal *.exe file on the Desktop after installation, you can add something like this to the file “Modern.nsh” located at: "C:\Program Files\NSIS\Contrib\zip2exe\". Depending on your OS, the path could be at “Program Files (x86)”. Note that the EXE file path should be consistent with the path you selected under NSIS’s “Default Folder” drop-down menu, the folder name, and the EXE file name.
 ```
 Section "Desktop Shortcut" SectionX
     SetShellVarContext current
-    CreateShortCut "$DESKTOP\DesktopTranslator.lnk" "$PROGRAMFILES\DesktopTranslator\translator.exe"
+    CreateShortCut "$DESKTOP\DesktopTranslator.lnk" "$PROGRAMFILES\DesktopTranslator\DesktopTranslator.exe"
 SectionEnd
 ```
 If you get a permission error while trying to save the edited version of “Modern.nsh”, right-click your text editor (e.g. _Notepad_), and select "Run as administrator". Then, copy the contents of the file into a new file, and save it to the original location.  
-9. Finally, click the NSIS **Generate** button, which will create the ***.exe** installer that can be shipped to other Windows machines, without the need to install any extra requirements.
-10. After installation, if you applied step \#8, you should find an icon on the Desktop. To uninstall, you can simply remove the app folder from "Program Files". For more NSIS options, check this [example](https://nsis.sourceforge.io/A_simple_installer_with_start_menu_shortcut_and_uninstaller).
+5. Finally, click the NSIS **Generate** button, which will create the ***.exe** installer that can be shipped to other Windows machines, without the need to install any extra requirements.
+6. After installation, if you applied the shortcut step, you should find an icon on the Desktop. To uninstall, you can simply remove the app folder from "Program Files". For more NSIS options, check this [example](https://nsis.sourceforge.io/A_simple_installer_with_start_menu_shortcut_and_uninstaller).
 
 ### Build macOS App
 
-1. Install `py2app`
+1. Install the requirements and PyInstaller, preferably in a virtual environment. A Python from [python.org](https://www.python.org/downloads/macos/) includes a recent Tk.
 ```
-pip3 install py2app==0.25
+pip3 install -r requirements.txt pyinstaller==6.22.3
 ```
-2. Create a [setup.py](https://gist.github.com/ymoslem/e0c88f30181191d57c374b6cdad9317c) file in the same directory.
-3. Run this command in the Terminal. You can add the option `-A` to test the app first.
+2. Run PyInstaller. This creates "dist/DesktopTranslator.app", for the type of Mac you are using.
 ```
-python3 setup.py py2app
+pyinstaller -y --windowed --name DesktopTranslator --add-data "utils:utils" --collect-data sentence_splitter --collect-data pysbd --collect-all Pmw --collect-all ctranslate2 translator.py
 ```
+3. To share the app, compress it into a *.zip archive.
+```
+ditto -c -k --keepParent dist/DesktopTranslator.app DesktopTranslator_macOS.zip
+```
+The app is not signed, so on another Mac, users need to click **Open Anyway** in **System Settings** > **Privacy & Security** the first time.
 
 
 ## References
