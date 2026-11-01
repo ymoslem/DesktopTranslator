@@ -215,6 +215,9 @@ class Window(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+    if "--dark" in sys.argv:  # to test the dark appearance; by default the system setting is used
+        sys.argv.remove("--dark")
+        app.styleHints().setColorScheme(Qt.ColorScheme.Dark)
     window = Window()
     window.resize(1200, 640)
     window.show()
