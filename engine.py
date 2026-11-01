@@ -2,6 +2,7 @@
 import codecs
 import json
 import os
+import subprocess
 import sys
 
 import ctranslate2
@@ -107,6 +108,64 @@ class Preferences:
             for key in ("ct2_model", "sp_model", "target_language"):
                 self.data.pop(key, None)
         save_settings(self.data)
+
+
+def memory_info():
+    """Total and available memory of the computer, in bytes; None if it cannot be read"""
+    try:
+        if sys.platform == "win32":
+            import ctypes
+
+            class Status(ctypes.Structure):
+                _fields_ = [("length", ctypes.c_ulong), ("load", ctypes.c_ulong), ("total", ctypes.c_ulonglong),
+                            ("available", ctypes.c_ulonglong), ("page_total", ctypes.c_ulonglong),
+                            ("page_available", ctypes.c_ulonglong), ("virtual_total", ctypes.c_ulonglong),
+                            ("virtual_available", ctypes.c_ulonglong), ("extended", ctypes.c_ulonglong)]
+
+            status = Status()
+            status.length = ctypes.sizeof(Status)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status))
+            return status.total, status.available
+        if sys.platform == "darwin":
+            import subprocess
+
+            total = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"]).strip())
+            lines = subprocess.check_output(["vm_stat"], text=True).splitlines()
+            page = int(lines[0].split("page size of")[1].split()[0])
+            pages = {line.split(":")[0]: int(line.split(":")[1].strip().rstrip(".")) for line in lines[1:] if ":" in line}
+            # Free, inactive, speculative, and purgeable pages can be used when needed
+            free = sum(pages.get("Pages " + name, 0) for name in ("free", "inactive", "speculative", "purgeable"))
+            return total, free * page
+        with open("/proc/meminfo") as meminfo:
+            values = {line.split(":")[0]: int(line.split(":")[1].split()[0]) * 1024 for line in meminfo}
+        return values["MemTotal"], values["MemAvailable"]
+    except (OSError, ValueError, KeyError, IndexError, AttributeError, subprocess.SubprocessError):
+        return None
+
+
+def memory_needed(model_dir):
+    """Estimated memory to translate with a CTranslate2 model, in bytes
+
+    It is 1.3 times the size of the model file plus 1 GB, which covers the sentences of a normal text.
+    A very long sentence needs more, and a larger beam size slightly more."""
+    size = os.path.getsize(os.path.join(model_dir, "model.bin")) if os.path.isfile(os.path.join(model_dir, "model.bin")) else 0
+    return int(1.3 * size + 1e9)
+
+
+def memory_warning(model_dir, info=None):
+    """A warning for the user if the model may not fit in the memory of the computer, else ""."""
+    info = info or memory_info()
+    if info is None:
+        return ""
+    total, available = info
+    needed = memory_needed(model_dir)
+    if needed > 0.8 * total:
+        return ("This model needs about %.1f GB of memory, and this computer has %.1f GB. "
+                "It will probably be very slow or fail." % (needed / 1e9, total / 1e9))
+    if needed > available:
+        return ("This model needs about %.1f GB of memory, and %.1f GB is free now. "
+                "Closing other applications may help." % (needed / 1e9, available / 1e9))
+    return ""
 
 
 SENTENCEPIECE_NAMES = ("sentencepiece.model", "sentencepiece.bpe.model", "source.spm", "source.spm.model")
