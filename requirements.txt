@@ -8,4 +8,3 @@ Pmw==2.1.1
 pysbd==0.3.4
 sentencepiece==0.2.2
 sentence-splitter==1.4
-tqdm==4.70.1

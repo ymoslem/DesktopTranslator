@@ -2,10 +2,8 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter.filedialog import askopenfilename, askopenfile, askdirectory
 from tkinter.filedialog import asksaveasfilename
-from tkinter.messagebox import showinfo, showerror, askquestion
+from tkinter.messagebox import showinfo, showerror
 import Pmw
-from tqdm.tk import tqdm
-from numpy import array, array_split
 from datetime import datetime
 import ctranslate2
 import sentencepiece as spm
@@ -13,9 +11,13 @@ from charset_normalizer import from_path
 import fasttext
 import multiprocessing
 import os
+import queue
+import threading
 import webbrowser
 import json
 from utils.paragraph_splitter import paragraph_tokenizer, paragraph_detokenizer, join_lines
+from utils.model_info import read_vocabulary, detect_model_type
+from utils.rtl import is_rtl_target, add_rtl_marks, strip_bidi_marks
 from utils.settings import load_settings, save_settings
 
 
@@ -28,7 +30,7 @@ class TranslatorGUI:
         self.main_frame.pack(fill=tk.BOTH, expand=True)
         self.main_frame.columnconfigure(0, weight=1)
         self.main_frame.columnconfigure(1, weight=1)
-        self.main_frame.rowconfigure(1, weight=1)
+        self.main_frame.rowconfigure(2, weight=1)
 
         self.model = tk.StringVar(self.main_frame)
         self.sp_model = tk.StringVar(self.main_frame)
@@ -42,8 +44,18 @@ class TranslatorGUI:
         self.join_lines_option = tk.BooleanVar(
             self.main_frame, value=self.settings.get("join_lines", False)
         )
+        self.rtl_view_option = tk.BooleanVar(
+            self.main_frame, value=self.settings.get("rtl_view", True)
+        )
+        self.translation = ""  # the translation without direction marks
+        self.target_is_rtl = False
         self.translator = None
         self.sp_source_model = None
+        self.model_type = None  # "m2m", "nllb", "other", or None until a model is selected
+        self.model_vocabulary = set()
+        self.worker = None
+        self.cancel_event = threading.Event()
+        self.messages = queue.Queue()
 
         self.createWidgets()
         self.createMenu()
@@ -67,8 +79,18 @@ class TranslatorGUI:
             highlightcolor="white smoke",
             highlightbackground="white smoke",
         )
-        self.source_text.grid(row=1, column=0, sticky="nsew")
+        self.source_text.grid(row=2, column=0, sticky="nsew")
         self.source_text.focus_set()
+
+        # Create the headers above the text areas
+        self.source_header = tk.Label(
+            self.main_frame, text="Source", anchor=tk.W, padx=7, bg="white smoke"
+        )
+        self.source_header.grid(row=1, column=0, sticky="nsew")
+        self.target_header = tk.Label(
+            self.main_frame, text="Translation", anchor=tk.W, padx=7, bg="white smoke"
+        )
+        self.target_header.grid(row=1, column=1, sticky="nsew")
 
         # Create the target text input
         self.target_text = tk.Text(
@@ -83,21 +105,28 @@ class TranslatorGUI:
             highlightcolor="white smoke",
             highlightbackground="white smoke",
         )
-        self.target_text.grid(row=1, column=1, sticky="nsew")
+        self.target_text.grid(row=2, column=1, sticky="nsew")
+        self.target_text.tag_configure("rtl", justify="right")
+        self.target_text.bind("<<Copy>>", self.copy_translation)
 
-        # Create the statusbar
+        # Create the statusbar, the progress bar, and the loaded model label
+        self.statusframe = tk.Frame(self.main_frame, bd=1, relief=tk.SUNKEN, bg="white smoke")
+        self.statusframe.grid(row=3, column=0, columnspan=2, sticky="nsew")
         self.statusbar = tk.Label(
-            self.main_frame,
+            self.statusframe,
             anchor=tk.W,
-            bd=1,
-            relief=tk.SUNKEN,
             padx=5,
             pady=5,
             bg="white smoke",
             fg="black",
             text="Select a model and enter text to translate!",
         )
-        self.statusbar.grid(row=2, column=0, columnspan=2, sticky="nsew")
+        self.statusbar.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        self.model_info = tk.Label(
+            self.statusframe, anchor=tk.E, padx=5, pady=5, bg="white smoke", fg="gray30"
+        )
+        self.model_info.pack(side=tk.RIGHT)
+        self.progress = ttk.Progressbar(self.statusframe, length=200, mode="determinate")
 
         # Create the select CTranslate2 model button
         self.button_model = tk.Button(
@@ -159,7 +188,7 @@ class TranslatorGUI:
                 bg="white smoke",
             ).pack(side=tk.LEFT, ipady=2)
 
-        # M2M widgets
+        # Target language widgets, used by the multilingual models
 
         # Create a vertical separator
         style = ttk.Style()
@@ -174,60 +203,32 @@ class TranslatorGUI:
         separator = ttk.Separator(self.toolbar, orient="vertical")
         separator.pack(side=tk.LEFT, fill=tk.Y)
 
-        self.m2m_label = tk.Label(
+        self.target_label = tk.Label(
             self.toolbar,
-            text="M2M-100:",
+            text="Target language:",
             bg="white smoke",
         )
-        self.m2m_label.pack(side=tk.LEFT, padx=2, pady=2)
+        self.target_label.pack(side=tk.LEFT, padx=2, pady=2)
 
-        # Load the JSON containing M2M-100 model supported languages
+        # Load the JSON files containing the languages supported by the multilingual models
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        json_file = os.path.join(dir_path, "utils", "m2m_languages.json")
-        with open(json_file) as m2m_languages:
-            self.language_codes = json.load(m2m_languages)
-        languages = ["None"] + sorted(self.language_codes)
+        self.language_lists = {}
+        for model_type in ("m2m", "nllb"):
+            json_file = os.path.join(dir_path, "utils", model_type + "_languages.json")
+            with open(json_file, encoding="utf-8") as languages_file:
+                self.language_lists[model_type] = json.load(languages_file)
+        json_file = os.path.join(dir_path, "utils", "fasttext_to_flores.json")
+        with open(json_file, encoding="utf-8") as codes_file:
+            self.fasttext_to_flores = json.load(codes_file)
+        self.language_codes = {}
 
-        # Create M2M-100 language selection combobox
-        self.combobox = ttk.Combobox(self.toolbar, values=languages)
+        # Create the target language selection combobox
+        self.combobox = ttk.Combobox(self.toolbar, values=["None"], state="disabled", width=24)
         self.combobox.pack(side=tk.LEFT, padx=2, pady=2, fill=tk.BOTH)
         self.combobox.current(0)
         self.balloon.bind(
-            self.combobox, "For M2M-100 model, select the target language"
-        )
-
-        # Create download buttons for M2M-100 models
-        self.download_label = tk.Label(
-            self.toolbar,
-            text="Download:",
-            bg="white smoke",
-        )
-        self.download_label.pack(side=tk.LEFT, padx=2, pady=2)
-
-        self.download_button_418m = tk.Button(
-            self.toolbar,
-            text="418M",
-            cursor="hand2",
-            width=5,
-            highlightbackground="white smoke",
-            command=self.download_m2m_418m,
-        )
-        self.download_button_418m.pack(side=tk.LEFT, padx=2, pady=2)
-        self.balloon.bind(
-            self.download_button_418m, "Download M2M-100 418M-parameter model"
-        )
-
-        self.download_button_12b = tk.Button(
-            self.toolbar,
-            text="1.2B",
-            cursor="hand2",
-            width=5,
-            highlightbackground="white smoke",
-            command=self.download_m2m_12b,
-        )
-        self.download_button_12b.pack(side=tk.LEFT, padx=2, pady=2)
-        self.balloon.bind(
-            self.download_button_12b, "Download M2M-100 1.2B-parameter model"
+            self.combobox,
+            "For the multilingual models (M2M-100 and NLLB-200), select the target language",
         )
 
     def createMenu(self):
@@ -270,6 +271,11 @@ class TranslatorGUI:
             command=self.store_settings,
         )
         self.translatemenu.add_checkbutton(
+            label="Right-to-Left View",
+            variable=self.rtl_view_option,
+            command=self.toggle_rtl_view,
+        )
+        self.translatemenu.add_checkbutton(
             label="Remember Model Paths",
             variable=self.remember_paths,
             command=self.store_settings,
@@ -278,6 +284,16 @@ class TranslatorGUI:
 
         # Create the Help menu and add the menu items
         self.helpmenu = tk.Menu(self.menubar, tearoff=0)
+        self.helpmenu.add_command(
+            label="Download NLLB-200 600M Model", command=self.download_nllb_600m
+        )
+        self.helpmenu.add_command(
+            label="Download M2M-100 418M Model", command=self.download_m2m_418m
+        )
+        self.helpmenu.add_command(
+            label="Download M2M-100 1.2B Model", command=self.download_m2m_12b
+        )
+        self.helpmenu.add_separator()
         self.helpmenu.add_command(label="About", command=self.show_info)
         self.menubar.add_cascade(label="Help", menu=self.helpmenu)
 
@@ -304,6 +320,15 @@ class TranslatorGUI:
         self.line_count = len(self.source_text.get(1.0, tk.END).splitlines())
         self.statusbar.config(text="Lines: " + str(self.line_count))
 
+    def copy_translation(self, event=None):
+        try:
+            selected = self.target_text.get(tk.SEL_FIRST, tk.SEL_LAST)
+        except tk.TclError:
+            return "break"
+        self.target_text.clipboard_clear()
+        self.target_text.clipboard_append(strip_bidi_marks(selected))
+        return "break"
+
     def select_all(self):
         self.source_text.tag_add(tk.SEL, "1.0", tk.END)
         self.source_text.mark_set(tk.INSERT, "1.0")
@@ -327,7 +352,7 @@ class TranslatorGUI:
             filetypes=[("Text Files", "*.txt")], defaultextension=".txt"
         )
         if self.file is not None:
-            self.data = self.target_text.get(1.0, tk.END)
+            self.data = strip_bidi_marks(self.target_text.get(1.0, tk.END))
             if len(self.data) > 0:
                 with open(self.file, "w+", encoding="utf-8") as output:
                     output.write(self.data)
@@ -336,18 +361,19 @@ class TranslatorGUI:
 
     def clear(self):
         self.source_text.delete(1.0, tk.END)
-        self.target_text.delete(1.0, tk.END)
+        self.show_translation("")
         self.statusbar.config(text="")
 
     def show_info(self):
         showinfo(
             "About",
-            "DesktopTranslator (0.2.6)\n\nDeveloped by: Yasmin Moslem\nwww.machinetranslation.io",
+            "DesktopTranslator (0.3.0)\n\nDeveloped by: Yasmin Moslem\nwww.machinetranslation.io",
         )
 
     def store_settings(self):
         self.settings["remember_model_paths"] = self.remember_paths.get()
         self.settings["join_lines"] = self.join_lines_option.get()
+        self.settings["rtl_view"] = self.rtl_view_option.get()
         if self.remember_paths.get():
             self.settings["ct2_model"] = self.model.get()
             self.settings["sp_model"] = self.sp_model.get()
@@ -360,8 +386,9 @@ class TranslatorGUI:
         if self.remember_paths.get():
             ct2_model = self.settings.get("ct2_model", "")
             sp_model = self.settings.get("sp_model", "")
-            if os.path.isdir(ct2_model):
+            if os.path.isdir(ct2_model) and ctranslate2.contains_model(ct2_model):
                 self.model.set(ct2_model)
+                self.set_model_type(ct2_model)
             if os.path.isfile(sp_model):
                 self.sp_model.set(sp_model)
             if self.model.get() != "" or self.sp_model.get() != "":
@@ -372,6 +399,7 @@ class TranslatorGUI:
                     + os.path.basename(self.sp_model.get())
                     + " (loaded when you click Translate)"
                 )
+                self.show_model_info()
 
     def load_remembered_models(self):
         # Models restored from the settings are loaded on the first translation
@@ -381,11 +409,35 @@ class TranslatorGUI:
         if self.sp_source_model is None and self.sp_model.get() != "":
             self.load_sp_model(self.sp_model.get())
 
+    def set_model_type(self, model_dir):
+        """Adapt the target language selector to the kind of model"""
+        previous_type = self.model_type
+        self.model_vocabulary = read_vocabulary(model_dir)
+        self.model_type = detect_model_type(self.model_vocabulary)
+        if self.model_type in self.language_lists:
+            self.language_codes = self.language_lists[self.model_type]
+            self.combobox.config(values=["None"] + sorted(self.language_codes), state="readonly")
+            if previous_type != self.model_type:
+                self.combobox.set("None")
+        else:
+            self.language_codes = {}
+            self.combobox.config(values=["Not needed"], state="disabled")
+            self.combobox.set("Not needed")
+
+    def show_model_info(self):
+        names = [os.path.basename(self.model.get()), os.path.basename(self.sp_model.get())]
+        self.model_info.config(text="Model: " + " | ".join(n for n in names if n))
+
+    def initial_dir(self, directory):
+        # The dialogs start in the folder of the last selected model, if it still exists
+        return directory if os.path.isdir(directory) else None
+
     def open_model(self):
         self.toolbar.update()  # for macOS
         model_dir = askdirectory(
             title="Select the CTranslate2 model folder",
             message="Select the CTranslate2 model folder",  # shown by macOS instead of the title
+            initialdir=self.initial_dir(os.path.dirname(self.model.get())),
         )
         if model_dir != "":
             self.load_model(model_dir)
@@ -400,21 +452,7 @@ class TranslatorGUI:
             )
             return False
 
-        # Check if it is an M2M model
-        shared_vocab_path = os.path.join(self.model_dir, "shared_vocabulary.txt")
-        if os.path.exists(shared_vocab_path):
-            with open(shared_vocab_path, "rb") as vocab_file:
-                vocab_file.seek(-300, 2)
-                line = vocab_file.readlines()[-8].decode("utf-8").strip()
-                if "madeupwordforbt" == line:
-                    # self.combobox.set("English")
-                    self.m2m = True
-                else:
-                    self.m2m = False
-                    self.combobox.set("None")
-        else:
-            self.m2m = False
-            self.combobox.set("None")
+        self.set_model_type(self.model_dir)
 
         self.model.set(self.model_dir)
         self.statusbar.config(text="CT2 Model path: " + self.model_dir)
@@ -429,6 +467,7 @@ class TranslatorGUI:
             inter_threads=self.inter_threads,
             intra_threads=self.intra_threads,
         )
+        self.show_model_info()
         self.store_settings()
         return True
 
@@ -437,6 +476,7 @@ class TranslatorGUI:
         self.model_file = askopenfile(
             title="Select the SentencePiece model file",
             filetypes=[("SentencePiece Model", "*.model")],
+            initialdir=self.initial_dir(os.path.dirname(self.sp_model.get())),
         )
         if self.model_file:
             self.load_sp_model(self.model_file.name)
@@ -445,7 +485,14 @@ class TranslatorGUI:
         self.sp_model.set(sp_model_path)
         self.statusbar.config(text="SP Model path: " + sp_model_path)
         self.sp_source_model = spm.SentencePieceProcessor(sp_model_path)
+        self.show_model_info()
         self.store_settings()
+
+    def download_nllb_600m(self):
+        self.toolbar.update()  # for macOS
+        webbrowser.open_new(
+            "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_distilled_600M_int8_ct2.zip"
+        )
 
     def download_m2m_418m(self):
         self.toolbar.update()  # for macOS
@@ -470,135 +517,199 @@ class TranslatorGUI:
         self.detected_lang_code_alt = prediction[1][1][9:]
         return self.detected_lang_code, self.detected_lang_code_alt
 
+    def find_source_language(self, text):
+        """Detect the source language; return its code and the prefix token the model needs"""
+        codes = self.detect_language(text)
+        if self.model_type == "m2m":
+            for code in codes:
+                if "__" + code + "__" in self.language_codes.values():
+                    return code, "__" + code + "__"
+        elif self.model_type == "nllb":
+            for code in codes:
+                if code in self.fasttext_to_flores:
+                    return code, self.fasttext_to_flores[code]
+        else:
+            return codes[0], ""
+        return None, None
+
     def translate_input(self):
-        self.target_text.delete(1.0, tk.END)
+        if self.worker is not None:
+            return
+
+        self.show_translation("")
         self.source_text_string = self.source_text.get(1.0, tk.END)
 
         if len(self.source_text_string) > 1:
             self.load_remembered_models()
 
-        if len(self.source_text_string) > 1 and \
-            self.model.get() != "" and \
-             self.sp_model.get() != "":
-
-            if self.m2m and self.combobox.get() == "None":
-                question = askquestion(
-                    "M2M Model",
-                    "It seems you selected a multilingual model.\nDo you want to stop to select the target language?",
-                )
-                if question == "yes":
-                    return
-                else:
-                    self.combobox.set("English")
-            elif self.m2m is False and self.combobox.get() != "None":
-                question = askquestion(
-                    "Not an M2M Model",
-                    "It seems the model you selected is not an M2M-100 model.\nDo you want to remove the target language?",
-                )
-                if question == "yes":
-                    self.combobox.set("None")
-
-            lang_option = self.combobox.get()
-            self.target_lang_code = (
-                self.language_codes[lang_option] if lang_option != "None" else ""
-            )
-            self.source_lang_codes = self.detect_language(self.source_text_string)
-
-            self.source_lang_code = self.source_lang_codes[0]
-            self.src_prefix = "__" + self.source_lang_codes[0] + "__"
-            if self.src_prefix not in self.language_codes.values():
-                self.source_lang_code = self.source_lang_codes[1]
-                self.src_prefix = "__" + self.source_lang_codes[1] + "__"
-                if self.src_prefix not in self.language_codes.values():
-                    showerror("", "Source language not supported or not recognized! Try to add more text.")
-                    return
-
-            source_text = self.source_text_string
-            if self.join_lines_option.get():
-                source_text = join_lines(source_text)
-            self.source_sents, self.breaks = paragraph_tokenizer(
-                source_text, self.source_lang_code
-            )
-
-            self.start = datetime.now()
-            max_batch_size = 2048
-            beam_size_val = self.beam_size.get()
-
-            self.statusbar.config(text="Translating...")
-
-            self.n_splits = round((len(self.source_sents) / 8) + 0.5)
-            self.splits = array_split(array(self.source_sents), self.n_splits)
-            self.splits = [split.tolist() for split in self.splits]
-
-            translations = []
-
-            with tqdm(
-                total=len(self.source_text_string.split()),
-                desc="Translation progress (words)",
-                unit=" split",
-                disable=(len(self.splits) < 2),
-                leave=False,
-            ) as tq:
-                tq.refresh()
-                self.main_frame.update()
-
-                for split in self.splits:
-                    if self.target_lang_code != "":
-                        tgt_prefix = [[self.target_lang_code]] * len(split)
-                        src_prefix = self.src_prefix
-                        start_pos = 7
-                        max_batch_size = 1024
-                    else:
-                        tgt_prefix = None
-                        src_prefix = ""
-                        start_pos = 0
-
-                    source_sents_tok = self.sp_source_model.encode(
-                        split, out_type=str
-                    )
-                    if src_prefix != "":
-                        source_sents_tok = [
-                            [src_prefix] + sent for sent in source_sents_tok
-                        ]
-
-                    translations_tok = self.translator.translate_batch(
-                        source=source_sents_tok,
-                        beam_size=beam_size_val,
-                        batch_type="tokens",
-                        max_batch_size=max_batch_size,
-                        replace_unknowns=True,
-                        repetition_penalty=1.2,
-                        target_prefix=tgt_prefix,
-                    )
-
-                    translations_so_far = [
-                        " ".join(translation.hypotheses[0])
-                        .replace(" ", "")
-                        .replace("▁", " ")[start_pos:]
-                        .strip()
-                        for translation in translations_tok
-                    ]
-                    translations.extend(translations_so_far)
-
-                    tq.update(len(" ".join(split).split()))
-                    tq.refresh()
-                    self.main_frame.update()
-
-                translations_formatted = paragraph_detokenizer(
-                    translations, self.breaks
-                )
-                self.target_text.insert(tk.END, translations_formatted + "\n")
-
-                elapsed = str(datetime.now() - self.start)
-                self.statusbar.config(
-                    text="Congratulations! Translation completed. Time elapsed: " + elapsed
-                )
-
-        else:
+        if not (
+            len(self.source_text_string) > 1
+            and self.model.get() != ""
+            and self.sp_model.get() != ""
+        ):
             showerror(
                 "No model selected",
                 "Please select both CTranslate2 and SentencePiece models, and enter text to translate.",
             )
+            return
+
+        # Target language, for the multilingual models
+        self.target_lang_code = ""
+        if self.model_type in self.language_lists:
+            lang_option = self.combobox.get()
+            if lang_option == "None":
+                showerror("Target language", "Please select the target language.")
+                return
+            self.target_lang_code = self.language_codes[lang_option]
+            if self.target_lang_code not in self.model_vocabulary:
+                showerror(
+                    "Target language",
+                    "This model does not support the target language " + lang_option + ".",
+                )
+                return
+
+        self.target_is_rtl = is_rtl_target(self.model_type, self.target_lang_code)
+
+        # Source language
+        self.source_lang_code, self.src_prefix = self.find_source_language(
+            self.source_text_string
+        )
+        if self.source_lang_code is None:
+            showerror("", "Source language not supported or not recognized! Try to add more text.")
+            return
+        self.source_header.config(text="Source (detected: " + self.source_lang_code + ")")
+
+        source_text = self.source_text_string
+        if self.join_lines_option.get():
+            source_text = join_lines(source_text)
+        self.source_sents, self.breaks = paragraph_tokenizer(
+            source_text, self.source_lang_code
+        )
+
+        self.start = datetime.now()
+        self.batches = [
+            self.source_sents[i : i + 8] for i in range(0, len(self.source_sents), 8)
+        ]
+        self.total_words = max(len(" ".join(self.source_sents).split()), 1)
+
+        self.progress.config(maximum=self.total_words, value=0)
+        self.progress.pack(side=tk.RIGHT, padx=5)
+        self.statusbar.config(text="Translating...")
+        self.button_translate.config(text="Cancel", command=self.cancel_translation)
+        self.cancel_event.clear()
+
+        self.worker = threading.Thread(
+            target=self.run_translation,
+            args=(self.batches, self.beam_size.get(), self.target_lang_code, self.src_prefix),
+            daemon=True,
+        )
+        self.worker.start()
+        self.window.after(100, self.poll_translation)
+
+    def show_translation(self, text):
+        """Show the translation; right-to-left languages get direction marks and a read-only pane"""
+        self.translation = text
+        self.target_text.config(state=tk.NORMAL)
+        self.target_text.delete(1.0, tk.END)
+        if text == "":
+            self.target_text.config(insertwidth=2)
+        elif self.target_is_rtl and self.rtl_view_option.get():
+            self.target_text.insert(tk.END, add_rtl_marks(text) + "\n", "rtl")
+            # The cursor is hidden because Tk splits a line at the cursor and changes its direction
+            self.target_text.config(state=tk.DISABLED, insertwidth=0)
+        else:
+            self.target_text.insert(tk.END, text + "\n")
+            self.target_text.config(insertwidth=2)
+
+    def toggle_rtl_view(self):
+        if str(self.target_text.cget("state")) == tk.NORMAL:
+            # Keep the edits made in the editable pane
+            self.translation = strip_bidi_marks(self.target_text.get(1.0, tk.END)).rstrip("\n")
+        if self.translation != "":
+            self.show_translation(self.translation)
+        self.store_settings()
+
+    def cancel_translation(self):
+        self.cancel_event.set()
+        self.statusbar.config(text="Cancelling...")
+
+    def run_translation(self, batches, beam_size, target_lang_code, src_prefix):
+        # Runs in a worker thread, so it must not touch the interface; it reports through a queue
+        try:
+            translations = []
+            words_done = 0
+            for batch in batches:
+                if self.cancel_event.is_set():
+                    self.messages.put(("cancelled", None))
+                    return
+                translations.extend(
+                    self.translate_batch(batch, beam_size, target_lang_code, src_prefix)
+                )
+                words_done += len(" ".join(batch).split())
+                self.messages.put(("progress", words_done))
+            self.messages.put(("done", translations))
+        except Exception as error:
+            self.messages.put(("error", error))
+
+    def translate_batch(self, batch, beam_size, target_lang_code, src_prefix):
+        source_tok = self.sp_source_model.encode(batch, out_type=str)
+        if src_prefix != "":
+            source_tok = [[src_prefix] + sent for sent in source_tok]
+        if self.model_type == "nllb":
+            source_tok = [sent + ["</s>"] for sent in source_tok]
+
+        target_prefix = [[target_lang_code]] * len(batch) if target_lang_code else None
+        results = self.translator.translate_batch(
+            source=source_tok,
+            beam_size=beam_size,
+            batch_type="tokens",
+            max_batch_size=1024 if target_prefix else 2048,
+            replace_unknowns=True,
+            repetition_penalty=1.2,
+            target_prefix=target_prefix,
+        )
+
+        translations = []
+        for result in results:
+            tokens = result.hypotheses[0]
+            if target_prefix:
+                tokens = tokens[1:]  # the first token is the target language code
+            translations.append("".join(tokens).replace("\u2581", " ").strip())
+        return translations
+
+    def poll_translation(self):
+        finished = False
+        try:
+            while True:
+                kind, payload = self.messages.get_nowait()
+                if kind == "progress":
+                    self.progress.config(value=payload)
+                    percent = int(100 * payload / self.total_words)
+                    self.statusbar.config(text="Translating... " + str(percent) + "%")
+                elif kind == "done":
+                    translations_formatted = paragraph_detokenizer(payload, self.breaks)
+                    self.show_translation(translations_formatted)
+                    elapsed = str(datetime.now() - self.start)
+                    self.statusbar.config(
+                        text="Congratulations! Translation completed. Time elapsed: " + elapsed
+                    )
+                    finished = True
+                elif kind == "cancelled":
+                    self.statusbar.config(text="Translation cancelled.")
+                    finished = True
+                elif kind == "error":
+                    self.statusbar.config(text="Translation failed.")
+                    showerror("Translation failed", str(payload))
+                    finished = True
+        except queue.Empty:
+            pass
+
+        if finished:
+            self.worker = None
+            self.progress.pack_forget()
+            self.button_translate.config(text="Translate", command=self.translate_input)
+        else:
+            self.window.after(100, self.poll_translation)
 
 
 # Create the root window
