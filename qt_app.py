@@ -50,6 +50,7 @@ from utils.paragraph_splitter import paragraph_detokenizer
 APP_NAME = "DesktopTranslator"
 VERSION = "0.4.0 (development)"
 TARGET_PLACEHOLDER = "Select a language..."
+DEFAULT_TEXT_SIZE = 14
 QUALITY = {"Fast": 2, "Balanced": 3, "Accurate": 5}  # beam sizes
 RELEASES_URL = "https://github.com/ymoslem/DesktopTranslator/releases"
 DOWNLOADS = [
@@ -213,11 +214,11 @@ class Window(QMainWindow):
         self.target_text.setPlaceholderText("Open a model to start (Ctrl+M), or choose Help > Get Models")
         for pane in (self.source_text, self.target_text):
             pane.setAcceptRichText(False)
-            pane.setFontPointSize(14)
             # Each paragraph takes its direction from its first strong character
             option = pane.document().defaultTextOption()
             option.setTextDirection(Qt.LayoutDirection.LayoutDirectionAuto)
             pane.document().setDefaultTextOption(option)
+        self.set_text_size(self.preferences.get("text_size", DEFAULT_TEXT_SIZE))
         self.set_languages(None)
 
         top = QHBoxLayout()
@@ -327,19 +328,31 @@ class Window(QMainWindow):
         self.action(translate_menu, "Copy Translation", self.copy_translation, "Ctrl+Shift+C")
 
         view_menu = bar.addMenu("&View")
-        self.action(view_menu, "Larger Text", lambda: self.zoom(1), QKeySequence.StandardKey.ZoomIn)
+        larger = self.action(view_menu, "Larger Text", lambda: self.zoom(1), QKeySequence.StandardKey.ZoomIn)
+        larger.setShortcuts([QKeySequence.StandardKey.ZoomIn, QKeySequence("Ctrl+=")])  # = is + without Shift
         self.action(view_menu, "Smaller Text", lambda: self.zoom(-1), QKeySequence.StandardKey.ZoomOut)
+        self.action(view_menu, "Actual Size", lambda: self.zoom(0), "Ctrl+0")
 
         help_menu = bar.addMenu("&Help")
         self.action(help_menu, "Get Models...", self.show_models)
-        self.action(help_menu, "About " + APP_NAME, self.show_about)
+        about = self.action(help_menu, "About " + APP_NAME, self.show_about)
+        about.setMenuRole(QAction.MenuRole.NoRole)  # stays in the Help menu, also on macOS
 
     def focused_pane(self):
         return self.target_text if self.target_text.hasFocus() else self.source_text
 
-    def zoom(self, step):
+    def set_text_size(self, size):
+        self.text_size = max(8, min(48, size))
         for pane in (self.source_text, self.target_text):
-            pane.zoomIn(step) if step > 0 else pane.zoomOut(-step)
+            font = pane.font()
+            font.setPointSize(self.text_size)
+            pane.setFont(font)
+
+    def zoom(self, step):
+        """Make the text larger or smaller; 0 sets the usual size"""
+        self.set_text_size(self.text_size + step if step else DEFAULT_TEXT_SIZE)
+        self.preferences.set("text_size", self.text_size)
+        self.say("Text size: %d" % self.text_size)
 
     # Languages
 

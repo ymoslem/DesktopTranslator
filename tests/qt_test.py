@@ -164,6 +164,17 @@ wait(window)
 check(window.status_label.text() == "Translation cancelled." and window.translate_button.text() == "Translate" and not window.target_text.toPlainText(),
       "translation can be cancelled")
 
+# Text size and the menus
+sizes = [window.source_text.font().pointSize()]
+for name in ("Larger Text", "Larger Text", "Smaller Text", "Actual Size"):
+    next(a for a in window.findChildren(qt_app.QAction) if a.text() == name).trigger()
+    sizes.append((window.source_text.font().pointSize(), window.target_text.font().pointSize()))
+check(sizes == [14, (15, 15), (16, 16), (15, 15), (14, 14)], "the text can be made larger and smaller in both panes: " + str(sizes))
+larger = next(a for a in window.findChildren(qt_app.QAction) if a.text() == "Larger Text")
+check(any(k.toString() == "Ctrl+=" for k in larger.shortcuts()), "Ctrl+= also makes the text larger")
+about = next(a for a in window.findChildren(qt_app.QAction) if a.text().startswith("About"))
+check(about.menuRole() == qt_app.QAction.MenuRole.NoRole and any(a is about for a in window.menuBar().actions()[-1].menu().actions()), "About is in the Help menu")
+
 # Preferences, and the next session
 window.preferences.set("beam_size", 5)
 window.preferences.set("join_lines", True)
