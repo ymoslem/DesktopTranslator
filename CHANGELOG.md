@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.2.6
+
+### Changed
+
+- Status bar shows the remembered model paths at startup
+- Clearer titles and menu label for selecting the CTranslate2 model folder
+
+### Fixed
+
+- Extra windows opening in the stand-alone app when translating
+
+
 ## v0.2.5
 
 ### Added
