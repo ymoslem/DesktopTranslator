@@ -1,6 +1,7 @@
 """Draw the app icon: two speech bubbles, one with a Latin and one with an Arabic letter.
 
-Usage: python tools/make_icon.py img/icon.png [LETTER [FONT]]
+Usage: python tools/make_icon.py img/icon.png [LETTER [FONT [macos]]]
+With macos, the drawing is smaller, as macOS leaves a transparent margin around icons.
 This is a simple starting icon, to be replaced by a designed one.
 """
 import sys
@@ -27,13 +28,17 @@ def bubble(painter, rect, tail_left, fill):
     painter.drawPath(path.united(tail))
 
 
-def main(output, letter="ع", font_name="Geeza Pro"):
+def main(output, letter="ع", font_name="Geeza Pro", style=""):
     app = QGuiApplication([])
     image = QImage(SIZE, SIZE, QImage.Format.Format_ARGB32)
     image.fill(Qt.GlobalColor.transparent)
     painter = QPainter(image)
     painter.setRenderHint(QPainter.RenderHint.Antialiasing)
     painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+    if style == "macos":  # the icon takes 824 of 1024 pixels
+        painter.translate(SIZE / 2, SIZE / 2)
+        painter.scale(824 / 1024, 824 / 1024)
+        painter.translate(-SIZE / 2, -SIZE / 2)
 
     # Background: a rounded square with a blue gradient
     gradient = QLinearGradient(QPointF(0, 0), QPointF(0, SIZE))
@@ -66,4 +71,4 @@ def main(output, letter="ع", font_name="Geeza Pro"):
 
 
 if __name__ == "__main__":
-    main(*sys.argv[1:4])
+    main(*sys.argv[1:5])
