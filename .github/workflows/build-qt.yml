@@ -1,0 +1,85 @@
+name: Build the Qt prototype
+
+on:
+  push:
+    branches: [qt]
+    paths:
+      - qt_app.py
+      - engine.py
+      - .github/workflows/build-qt.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            name: macOS
+            separator: ":"
+            program: dist/DesktopTranslatorQt.app/Contents/MacOS/DesktopTranslatorQt
+          - os: windows-latest
+            name: Windows
+            separator: ";"
+            program: dist/DesktopTranslatorQt/DesktopTranslatorQt.exe
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt PySide6-Essentials==6.12.0 pyinstaller==6.22.3
+
+      - name: Build the app
+        run: |
+          pyinstaller -y --windowed --name DesktopTranslatorQt \
+            --add-data "utils${{ matrix.separator }}utils" \
+            --collect-data sentence_splitter \
+            --collect-data pysbd \
+            --collect-all ctranslate2 \
+            qt_app.py
+
+      - name: Measure the size
+        run: |
+          python - <<'PY' | tee size-${{ matrix.name }}.txt
+          import os, shutil
+          folder = "dist/DesktopTranslatorQt.app" if os.path.isdir("dist/DesktopTranslatorQt.app") else "dist/DesktopTranslatorQt"
+          total = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk(folder) for f in fs)
+          archive = shutil.make_archive("DesktopTranslatorQt", "zip", "dist")
+          print("${{ matrix.name }} Qt build: unpacked %.0f MB, zip %.0f MB" % (total / 1e6, os.path.getsize(archive) / 1e6))
+          PY
+
+      - name: Download the NLLB-200 model
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v0.3.0 --pattern "NLLB-200_distilled_600M_int8_ct2.zip" --dir model
+          python -m zipfile -e model/NLLB-200_distilled_600M_int8_ct2.zip model
+
+      - name: Translate English and Arabic samples, and take screenshots
+        run: |
+          printf 'Hello, how are you today?\nThe committee approved the new budget after a long debate.\n\nThank you very much for your help!\nDoes this work for you?\n' > en.txt
+          printf 'مرحبا بالعالم. كيف حالك اليوم؟\nوافقت اللجنة على الميزانية الجديدة بعد مناقشة طويلة.\n\nشكرا جزيلا لمساعدتك!\nهل هذا مناسب لك؟\nترجمة (Translation) تجريبية: 123.\n' > ar.txt
+          M=model/nllb-200-distilled-600M-int8
+          "${{ matrix.program }}" --demo $M $M/sentencepiece.model "Arabic (Modern Standard)" en.txt screenshot-en-ar-${{ matrix.name }}.png
+          "${{ matrix.program }}" --demo $M $M/sentencepiece.model "English" ar.txt screenshot-ar-en-${{ matrix.name }}.png
+          ls -la screenshot-*.png
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: qt-${{ matrix.name }}
+          path: |
+            size-${{ matrix.name }}.txt
+            screenshot-*.png
+          if-no-files-found: ignore
