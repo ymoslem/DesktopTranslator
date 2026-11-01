@@ -364,6 +364,14 @@ class TranslatorGUI:
                 self.model.set(ct2_model)
             if os.path.isfile(sp_model):
                 self.sp_model.set(sp_model)
+            if self.model.get() != "" or self.sp_model.get() != "":
+                self.statusbar.config(
+                    text="Remembered models: "
+                    + os.path.basename(self.model.get())
+                    + " | "
+                    + os.path.basename(self.sp_model.get())
+                    + " (loaded when you click Translate)"
+                )
 
     def load_remembered_models(self):
         # Models restored from the settings are loaded on the first translation
