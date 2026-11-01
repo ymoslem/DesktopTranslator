@@ -85,4 +85,5 @@ def paragraph_detokenizer(sentences, breaks):
             output.append(sentences[br] + " ")
 
     text = "".join(output)
-    return text
+    # Sentences are joined with a space, so lines would end with one
+    return "\n".join(line.rstrip() for line in text.split("\n"))

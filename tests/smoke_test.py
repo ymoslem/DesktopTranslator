@@ -14,7 +14,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 import utils.settings as settings_module
-from utils.paragraph_splitter import paragraph_tokenizer
+from utils.paragraph_splitter import paragraph_tokenizer, paragraph_detokenizer
 
 failures = []
 
@@ -24,6 +24,10 @@ def check(condition, description):
     if not condition:
         failures.append(description)
 
+
+# Translated lines do not end with a space
+joined = paragraph_detokenizer(["First.", "Second.", "Third."], [0, 1, "\n", "\n", 2])
+check(joined == "First. Second.\n\nThird.", "translated lines have no trailing space: " + repr(joined))
 
 # The settings file is in the per-user application folder
 path = settings_module.settings_path()
