@@ -1,6 +1,18 @@
+import re
 import pysbd
 from sentence_splitter import split_text_into_sentences
 from indicnlp.tokenize.sentence_tokenize import sentence_split
+
+
+def join_lines(text):
+    """Join single line breaks into spaces; blank lines still separate paragraphs
+    Args:
+        text (str): Text with line breaks inside sentences, e.g. from PDF or OCR
+
+    Returns:
+        text (str): Text with single line breaks replaced by spaces
+    """
+    return re.sub(r"(?<!\n)\n(?!\n)", " ", text)
 
 
 def paragraph_tokenizer(text, language="en"):

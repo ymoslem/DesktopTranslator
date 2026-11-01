@@ -14,7 +14,8 @@ import fasttext
 import os
 import webbrowser
 import json
-from utils.paragraph_splitter import paragraph_tokenizer, paragraph_detokenizer
+from utils.paragraph_splitter import paragraph_tokenizer, paragraph_detokenizer, join_lines
+from utils.settings import load_settings, save_settings
 
 
 class TranslatorGUI:
@@ -33,8 +34,19 @@ class TranslatorGUI:
         self.beam_size = tk.IntVar(self.main_frame)
         self.beam_size.set(3)
 
+        self.settings = load_settings()
+        self.remember_paths = tk.BooleanVar(
+            self.main_frame, value=self.settings.get("remember_model_paths", True)
+        )
+        self.join_lines_option = tk.BooleanVar(
+            self.main_frame, value=self.settings.get("join_lines", False)
+        )
+        self.translator = None
+        self.sp_source_model = None
+
         self.createWidgets()
         self.createMenu()
+        self.restore_model_paths()
 
     def createWidgets(self):
         # Create the toolbar
@@ -250,6 +262,17 @@ class TranslatorGUI:
         self.translatemenu.add_command(
             label="Select SentencePiece Model", command=self.open_sp_model
         )
+        self.translatemenu.add_separator()
+        self.translatemenu.add_checkbutton(
+            label="Join Lines",
+            variable=self.join_lines_option,
+            command=self.store_settings,
+        )
+        self.translatemenu.add_checkbutton(
+            label="Remember Model Paths",
+            variable=self.remember_paths,
+            command=self.store_settings,
+        )
         self.menubar.add_cascade(label="Translate", menu=self.translatemenu)
 
         # Create the Help menu and add the menu items
@@ -321,54 +344,93 @@ class TranslatorGUI:
             "DesktopTranslator (0.2.3)\n\nDeveloped by: Yasmin Moslem\nwww.machinetranslation.io",
         )
 
+    def store_settings(self):
+        self.settings["remember_model_paths"] = self.remember_paths.get()
+        self.settings["join_lines"] = self.join_lines_option.get()
+        if self.remember_paths.get():
+            self.settings["ct2_model"] = self.model.get()
+            self.settings["sp_model"] = self.sp_model.get()
+        else:
+            self.settings.pop("ct2_model", None)
+            self.settings.pop("sp_model", None)
+        save_settings(self.settings)
+
+    def restore_model_paths(self):
+        if self.remember_paths.get():
+            ct2_model = self.settings.get("ct2_model", "")
+            sp_model = self.settings.get("sp_model", "")
+            if os.path.isdir(ct2_model):
+                self.model.set(ct2_model)
+            if os.path.isfile(sp_model):
+                self.sp_model.set(sp_model)
+
+    def load_remembered_models(self):
+        # Models restored from the settings are loaded on the first translation
+        if self.translator is None and self.model.get() != "":
+            if not self.load_model(self.model.get()):
+                self.model.set("")
+        if self.sp_source_model is None and self.sp_model.get() != "":
+            self.load_sp_model(self.sp_model.get())
+
     def open_model(self):
         self.toolbar.update()  # for macOS
-        self.model_dir = askdirectory()
-        if self.model_dir != "":
-            # Check if the model is a valid CTranslate2 model
-            if ctranslate2.contains_model(self.model_dir):
-                # Check if it is an M2M model
-                shared_vocab_path = os.path.join(self.model_dir, "shared_vocabulary.txt")
-                if os.path.exists(shared_vocab_path):
-                    with open(shared_vocab_path, "rb") as vocab_file:
-                        vocab_file.seek(-300, 2)
-                        line = vocab_file.readlines()[-8].decode("utf-8").strip()
-                        if "madeupwordforbt" == line:
-                            # self.combobox.set("English")
-                            self.m2m = True
-                        else:
-                            self.m2m = False
-                            self.combobox.set("None")
+        model_dir = askdirectory()
+        if model_dir != "":
+            self.load_model(model_dir)
+
+    def load_model(self, model_dir):
+        self.model_dir = model_dir
+        # Check if the model is a valid CTranslate2 model
+        if not ctranslate2.contains_model(self.model_dir):
+            showerror(
+                "Invalid CTranslate2 model",
+                "Please make sure you select the direcotry of a valid CTranslate2 model!",
+            )
+            return False
+
+        # Check if it is an M2M model
+        shared_vocab_path = os.path.join(self.model_dir, "shared_vocabulary.txt")
+        if os.path.exists(shared_vocab_path):
+            with open(shared_vocab_path, "rb") as vocab_file:
+                vocab_file.seek(-300, 2)
+                line = vocab_file.readlines()[-8].decode("utf-8").strip()
+                if "madeupwordforbt" == line:
+                    # self.combobox.set("English")
+                    self.m2m = True
                 else:
                     self.m2m = False
                     self.combobox.set("None")
+        else:
+            self.m2m = False
+            self.combobox.set("None")
 
-                self.model.set(self.model_dir)
-                self.statusbar.config(text="CT2 Model path: " + self.model_dir)
+        self.model.set(self.model_dir)
+        self.statusbar.config(text="CT2 Model path: " + self.model_dir)
 
-                self.cpu_num = os.cpu_count()
-                self.inter_threads = 2
-                self.intra_threads = int(self.cpu_num / 2)
+        self.cpu_num = os.cpu_count()
+        self.inter_threads = 2
+        self.intra_threads = int(self.cpu_num / 2)
 
-                self.translator = ctranslate2.Translator(
-                    self.model_dir,
-                    device="cpu",
-                    inter_threads=self.inter_threads,
-                    intra_threads=self.intra_threads,
-                )
-            else:
-                showerror(
-                    "Invalid CTranslate2 model",
-                    "Please make sure you select the direcotry of a valid CTranslate2 model!",
-                )
+        self.translator = ctranslate2.Translator(
+            self.model_dir,
+            device="cpu",
+            inter_threads=self.inter_threads,
+            intra_threads=self.intra_threads,
+        )
+        self.store_settings()
+        return True
 
     def open_sp_model(self):
         self.toolbar.update()  # for macOS
         self.model_file = askopenfile(filetypes=[("SentencePiece Model", "*.model")])
         if self.model_file:
-            self.sp_model.set(self.model_file.name)
-            self.statusbar.config(text="SP Model path: " + self.model_file.name)
-            self.sp_source_model = spm.SentencePieceProcessor(self.model_file.name)
+            self.load_sp_model(self.model_file.name)
+
+    def load_sp_model(self, sp_model_path):
+        self.sp_model.set(sp_model_path)
+        self.statusbar.config(text="SP Model path: " + sp_model_path)
+        self.sp_source_model = spm.SentencePieceProcessor(sp_model_path)
+        self.store_settings()
 
     def download_m2m_418m(self):
         self.toolbar.update()  # for macOS
@@ -396,6 +458,9 @@ class TranslatorGUI:
     def translate_input(self):
         self.target_text.delete(1.0, tk.END)
         self.source_text_string = self.source_text.get(1.0, tk.END)
+
+        if len(self.source_text_string) > 1:
+            self.load_remembered_models()
 
         if len(self.source_text_string) > 1 and \
             self.model.get() != "" and \
@@ -433,8 +498,11 @@ class TranslatorGUI:
                     showerror("", "Source language not supported or not recognized! Try to add more text.")
                     return
 
+            source_text = self.source_text_string
+            if self.join_lines_option.get():
+                source_text = join_lines(source_text)
             self.source_sents, self.breaks = paragraph_tokenizer(
-                self.source_text_string, self.source_lang_code
+                source_text, self.source_lang_code
             )
 
             self.start = datetime.now()
