@@ -62,8 +62,6 @@ If you would like to try out the app and you do not have a model, you can downlo
 
 Now, DesktopTranslator supports [**M2M-100**](https://github.com/pytorch/fairseq/tree/main/examples/m2m_100) ([Fan et al., 2020](https://arxiv.org/abs/2010.11125)), a multilingual model that can translate between 100 languages.
     
-<kbd> ![DesktopTranslator](img/DesktopTranslator_M2M-100.png)
-
 To use M2M-100 models in DesktopTranslator, please follow these steps:
 1. Download one of the M2M-100 models, converted to the CTranslate2 format:  
     a. [M2M-100 418M-parameter model](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.1/M2M-100_418m_parameter_model_ct2.zip); smaller and faster, but sometimes less accurate; or  
