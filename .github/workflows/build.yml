@@ -50,6 +50,7 @@ jobs:
         run: |
           pyinstaller -y --windowed --name DesktopTranslator \
             --add-data "utils${{ matrix.separator }}utils" \
+            --add-data "NOTICE.md${{ matrix.separator }}." \
             --collect-data sentence_splitter \
             --collect-data pysbd \
             --collect-all Pmw \
