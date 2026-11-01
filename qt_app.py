@@ -42,6 +42,7 @@ from engine import (
     find_sentencepiece,
     format_duration,
     longest_line,
+    memory_warning,
     read_text_file,
     write_text_file,
 )
@@ -430,6 +431,11 @@ class Window(QMainWindow):
         self.save_settings()
 
     def load_model(self, model_dir):
+        warning = memory_warning(model_dir)
+        if warning:
+            answer = QMessageBox.question(self, "Large model", warning + "\n\nOpen the model anyway?")
+            if answer != QMessageBox.StandardButton.Yes:
+                return False
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             changed = self.engine.load_model(model_dir)

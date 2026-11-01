@@ -164,6 +164,20 @@ wait(window)
 check(window.status_label.text() == "Translation cancelled." and window.translate_button.text() == "Translate" and not window.target_text.toPlainText(),
       "translation can be cancelled")
 
+# A model that may not fit in the memory asks first
+model_before = window.engine.model_dir
+original = qt_app.memory_warning
+qt_app.memory_warning = lambda model_dir: "This model needs about 5.4 GB of memory, and 2.0 GB is free now."
+messages.clear()
+check(window.load_model(FREN + "/ct2_model") is False and messages and "5.4 GB" in messages[-1] and window.engine.model_dir == model_before,
+      "a model that may not fit in the memory is not opened without a yes")
+QMessageBox.question = staticmethod(lambda *a, **k: QMessageBox.StandardButton.Yes)
+check(window.load_model(FREN + "/ct2_model") is True and window.engine.model_dir == FREN + "/ct2_model", "it is opened after a yes")
+qt_app.memory_warning = original
+window.load_model(NLLB)
+window.target_combo.choose("French")
+QMessageBox.question = staticmethod(lambda *a, **k: (messages.append(a[2]), QMessageBox.StandardButton.No)[1])
+
 # Text size and the menus
 sizes = [window.source_text.font().pointSize()]
 for name in ("Larger Text", "Larger Text", "Smaller Text", "Actual Size"):
