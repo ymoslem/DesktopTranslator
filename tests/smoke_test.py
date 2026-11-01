@@ -92,7 +92,8 @@ app.show_translation("Привет, мир.\nمرحبا")
 app.save_file()
 with open(saved_file, "rb") as file:
     saved = file.read()
-check(saved.decode("utf-8").strip() == "Привет, мир.\nمرحبا" and not saved.startswith(b"\xef\xbb\xbf"),
+# Windows text files end their lines with CRLF
+check(saved.decode("utf-8").replace("\r\n", "\n").strip() == "Привет, мир.\nمرحبا" and not saved.startswith(b"\xef\xbb\xbf"),
       "a translation is saved as UTF-8")
 
 root.destroy()
