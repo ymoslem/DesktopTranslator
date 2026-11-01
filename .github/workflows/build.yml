@@ -6,6 +6,9 @@ on:
       tag:
         description: "Release tag to build, e.g. v0.2.4"
         required: true
+      ref:
+        description: "Commit to build, if it is not the tag (the tag name sets the version)"
+        required: false
       attach:
         description: "Attach the installers to the release"
         type: boolean
@@ -33,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ inputs.ref || inputs.tag }}
 
       - uses: actions/setup-python@v7
         with:
