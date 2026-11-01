@@ -107,7 +107,7 @@ path = os.path.join(FOLDER, "arabic.txt")
 with open(path, "w", encoding="utf-8") as file:
     file.write("مرحبا بالعالم.\nİyiyim.\n")
 window.open_text_file(path)
-check("مرحبا" in window.source_text.toPlainText() and "utf-8" in window.statusBar().currentMessage(), "a UTF-8 file is opened: " + window.statusBar().currentMessage())
+check("مرحبا" in window.source_text.toPlainText() and "utf-8" in window.status_label.text(), "a UTF-8 file is opened: " + window.status_label.text())
 latin = os.path.join(FOLDER, "latin1.txt")
 with open(latin, "w", encoding="latin-1") as file:
     file.write("Le café est très bon. Où est la gare ?\n")
@@ -155,13 +155,13 @@ window.translate_or_cancel()
 started, statuses = time.time(), []
 while window.worker is not None and time.time() - started < 6:
     app.processEvents()
-    statuses.append(window.statusBar().currentMessage())
+    statuses.append(window.status_label.text())
     time.sleep(0.02)
 check(window.translate_button.text() == "Cancel" and window.progress_bar.isVisibleTo(window) and any("left" in s for s in statuses),
       "while translating, the button says Cancel, a progress bar shows, and the time left is shown")
 window.cancel_action.trigger()
 wait(window)
-check(window.statusBar().currentMessage() == "Translation cancelled." and window.translate_button.text() == "Translate" and not window.target_text.toPlainText(),
+check(window.status_label.text() == "Translation cancelled." and window.translate_button.text() == "Translate" and not window.target_text.toPlainText(),
       "translation can be cancelled")
 
 # Preferences, and the next session
@@ -173,7 +173,7 @@ saved_settings = json.load(open(SETTINGS_FILE))
 check(saved_settings["ct2_model"] == NLLB and saved_settings["beam_size"] == 5 and saved_settings["target_language"] == {"nllb": "French"} and "geometry" in saved_settings,
       "the model, the language, the quality and the window are saved")
 window = qt_app.Window()
-check(window.engine.translator is None and window.target_combo.currentText() == "French" and "Last used model" in window.statusBar().currentMessage(),
+check(window.engine.translator is None and window.target_combo.currentText() == "French" and "Last used model" in window.status_label.text(),
       "the next session shows the last model and language without loading it")
 output = translate(window, "The committee approved the new budget.")
 check(output.startswith("Le comité") and window.engine.translator is not None, "the model is loaded when translating: " + repr(output))

@@ -209,8 +209,8 @@ class Window(QMainWindow):
         self.copy_button.setToolTip("Copy the translation (Ctrl+Shift+C)")
         self.source_text = SourceEdit()
         self.target_text = QTextEdit()
-        self.source_text.setPlaceholderText("Type or paste text here, drop a text file on it, or choose File > Open Text.")
-        self.target_text.setPlaceholderText("The translation appears here.")
+        self.source_text.setPlaceholderText("Type or paste text, or drop a text file here")
+        self.target_text.setPlaceholderText("Open a model to start (Ctrl+M), or choose Help > Get Models")
         for pane in (self.source_text, self.target_text):
             pane.setAcceptRichText(False)
             pane.setFontPointSize(14)
@@ -231,14 +231,20 @@ class Window(QMainWindow):
         top.addWidget(self.target_combo)
         top.addStretch()
 
+        header_height = self.copy_button.sizeHint().height()
+
         def pane_with_header(header, pane, button=None):
             row = QHBoxLayout()
+            row.setContentsMargins(0, 0, 0, 0)
             row.addWidget(header, 1)
             if button:
                 row.addWidget(button)
+            bar = QWidget()
+            bar.setLayout(row)
+            bar.setFixedHeight(header_height)  # both headers have the same height, so the panes line up
             column = QVBoxLayout()
             column.setContentsMargins(0, 0, 0, 0)
-            column.addLayout(row)
+            column.addWidget(bar)
             column.addWidget(pane)
             holder = QWidget()
             holder.setLayout(column)
@@ -259,9 +265,14 @@ class Window(QMainWindow):
         self.progress_bar = QProgressBar()
         self.progress_bar.setFixedWidth(160)
         self.progress_bar.hide()
+        # Labels with margins keep the text away from the window edges
+        self.status_label = QLabel()
+        self.status_label.setContentsMargins(12, 2, 12, 2)
+        self.model_label.setContentsMargins(12, 2, 12, 2)
+        self.statusBar().addWidget(self.status_label, 1)
         self.statusBar().addPermanentWidget(self.progress_bar)
         self.statusBar().addPermanentWidget(self.model_label)
-        self.statusBar().showMessage("Open a model to start, or choose Help > Get Models.")
+        self.say("Open a model to start, or choose Help > Get Models.")
 
         self.model_button.clicked.connect(self.open_model)
         self.translate_button.clicked.connect(self.translate_or_cancel)
@@ -270,6 +281,9 @@ class Window(QMainWindow):
         self.source_text.file_dropped.connect(self.open_text_file)
         self.source_combo.activated.connect(lambda _: self.update_header())
         self.target_combo.activated.connect(lambda _: self.remember_target())
+
+    def say(self, message):
+        self.status_label.setText(message)
 
     def action(self, menu, text, slot, shortcut=None, enabled=True):
         action = QAction(text, self)
@@ -364,7 +378,7 @@ class Window(QMainWindow):
             source = self.detected_name
         target = self.selected_target()
         if not source or not target:
-            self.statusBar().showMessage("Choose the two languages, or translate once, to swap them.")
+            self.say("Choose the two languages, or translate once, to swap them.")
             return
         self.source_combo.choose(target)
         self.target_combo.choose(source)
@@ -399,7 +413,7 @@ class Window(QMainWindow):
         self.engine.load_sp_model(path)
         self.sp_path = path
         self.pending_sp = ""
-        self.statusBar().showMessage("Model loaded: " + short_text(self.engine.model_dir, 70))
+        self.say("Model loaded: " + short_text(self.engine.model_dir, 70))
         self.save_settings()
 
     def load_model(self, model_dir):
@@ -420,6 +434,7 @@ class Window(QMainWindow):
         return True
 
     def show_model_name(self, model_dir):
+        self.target_text.setPlaceholderText("The translation appears here")
         self.model_label.setText("Model: " + short_text(os.path.basename(os.path.normpath(model_dir)), 40))
         self.model_label.setToolTip(model_dir)
 
@@ -447,7 +462,7 @@ class Window(QMainWindow):
             self.restore_target()
             self.pending_model = model_dir
             self.show_model_name(model_dir)
-            self.statusBar().showMessage("Last used model: " + short_text(os.path.basename(model_dir), 50) + " (loaded when you click Translate)")
+            self.say("Last used model: " + short_text(os.path.basename(model_dir), 50) + " (loaded when you click Translate)")
         if os.path.isfile(sp_path):
             self.pending_sp = sp_path
 
@@ -498,7 +513,7 @@ class Window(QMainWindow):
             return
         self.file_name = path
         self.source_text.setPlainText(text)
-        self.statusBar().showMessage("%d lines, %d words, encoding %s" % (text.count("\n") + 1, len(text.split()), encoding))
+        self.say("%d lines, %d words, encoding %s" % (text.count("\n") + 1, len(text.split()), encoding))
 
     def reopen_with_encoding(self):
         if not self.file_name:
@@ -520,9 +535,9 @@ class Window(QMainWindow):
         text = self.target_text.toPlainText()
         if text.strip():
             QApplication.clipboard().setText(text)
-            self.statusBar().showMessage("Translation copied to the clipboard.")
+            self.say("Translation copied to the clipboard.")
         else:
-            self.statusBar().showMessage("Nothing to copy.")
+            self.say("Nothing to copy.")
 
     def clear(self):
         self.source_text.clear()
@@ -538,7 +553,7 @@ class Window(QMainWindow):
             return
         text = self.source_text.toPlainText()
         if not text.strip():
-            self.statusBar().showMessage("Enter some text to translate.")
+            self.say("Enter some text to translate.")
             return
         if not self.ensure_loaded():
             QMessageBox.critical(self, "No model", "Please open a model first (Translate > Open Model).")
@@ -578,7 +593,7 @@ class Window(QMainWindow):
     def cancel(self):
         if self.worker is not None:
             self.worker.cancel = True
-            self.statusBar().showMessage("Cancelling...")
+            self.say("Cancelling...")
 
     def on_progress(self, words_done):
         self.progress_bar.setValue(words_done)
@@ -586,7 +601,7 @@ class Window(QMainWindow):
         elapsed = time.time() - self.start
         if elapsed > 3 and words_done:
             status += " (about " + format_duration(elapsed * (self.total_words - words_done) / words_done) + " left)"
-        self.statusBar().showMessage(status)
+        self.say(status)
 
     def on_done(self, translations):
         self.translation = paragraph_detokenizer(translations, self.breaks)
@@ -599,7 +614,7 @@ class Window(QMainWindow):
         self.progress_bar.hide()
         self.translate_button.setText("Translate")
         self.cancel_action.setEnabled(False)
-        self.statusBar().showMessage(message)
+        self.say(message)
 
     # Windows
 
