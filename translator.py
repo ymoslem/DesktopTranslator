@@ -91,9 +91,9 @@ class TranslatorGUI:
         self.toolbar.grid(row=0, column=0, columnspan=2, sticky="nsew")
         # Two rows keep every control visible on narrow windows
         self.toolbar_top = tk.Frame(self.toolbar, bg="white smoke")
-        self.toolbar_top.pack(side=tk.TOP, fill=tk.X)
+        self.toolbar_top.pack(side=tk.TOP, fill=tk.X, padx=6, pady=(4, 0))
         self.toolbar_bottom = tk.Frame(self.toolbar, bg="white smoke")
-        self.toolbar_bottom.pack(side=tk.TOP, fill=tk.X)
+        self.toolbar_bottom.pack(side=tk.TOP, fill=tk.X, padx=6, pady=(2, 4))
 
         # Create the source text input
         self.source_text = tk.Text(
@@ -130,7 +130,7 @@ class TranslatorGUI:
             highlightbackground="white smoke",
             command=self.copy_all_translation,
         )
-        self.button_copy.pack(side=tk.RIGHT, padx=2)
+        self.button_copy.pack(side=tk.RIGHT, padx=(2, 6))
 
         # Create the target text input
         self.target_text = tk.Text(
