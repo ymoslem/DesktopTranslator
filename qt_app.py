@@ -59,8 +59,8 @@ RELEASES_URL = REPOSITORY_URL + "/releases"
 DOWNLOADS = [
     ("NLLB-200 distilled 600M", "200 languages; the smallest and fastest",
      "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_distilled_600M_int8_ct2.zip"),
-    ("NLLB-200 distilled 1.2B", "200 languages; slower, needs more memory, sometimes more accurate",
-     "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_distilled_1.2B_int8_ct2.zip"),
+    ("NLLB-200 distilled 1.3B", "200 languages; slower, needs more memory, sometimes more accurate",
+     "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_distilled_1.3B_int8_ct2.zip"),
     ("M2M-100 418M", "100 languages; small",
      "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.1/M2M-100_418m_parameter_model_ct2.zip"),
     ("M2M-100 1.2B", "100 languages; larger",
