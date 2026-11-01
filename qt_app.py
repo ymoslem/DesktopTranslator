@@ -1,35 +1,74 @@
-"""A prototype of DesktopTranslator with a Qt interface, using the same engine as translator.py.
+"""DesktopTranslator with a Qt interface, using the same engine as translator.py.
 
 Usage: python qt_app.py
-       python qt_app.py --demo MODEL_DIR SP_MODEL TARGET_LANGUAGE TEXT_FILE OUTPUT.png (OUTPUT.png can be - to keep the window open)
+       python qt_app.py --demo MODEL_DIR SP_MODEL TARGET_LANGUAGE TEXT_FILE OUTPUT.png
+       (OUTPUT.png can be - to keep the window open; --dark shows the dark appearance)
 """
 import os
 import sys
 import time
 
-from PySide6.QtCore import Qt, QThread, QTimer, Signal
+from PySide6.QtCore import QByteArray, Qt, QThread, QTimer, QUrl, Signal
+from PySide6.QtGui import QAction, QDesktopServices, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QComboBox,
+    QCompleter,
+    QDialog,
+    QDialogButtonBox,
     QFileDialog,
+    QFormLayout,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QMainWindow,
     QMessageBox,
+    QProgressBar,
     QPushButton,
+    QSplitter,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
-from engine import AUTO_DETECT, Engine, EngineError, format_duration
+from engine import (
+    AUTO_DETECT,
+    DATA_DIR,
+    LONG_LINE_CHARS,
+    Engine,
+    EngineError,
+    Preferences,
+    find_sentencepiece,
+    format_duration,
+    longest_line,
+    read_text_file,
+    write_text_file,
+)
 from utils.paragraph_splitter import paragraph_detokenizer
-from utils.rtl import is_rtl_language, is_rtl_target
 
-PLACEHOLDER = "Select a language..."
+APP_NAME = "DesktopTranslator"
+VERSION = "0.4.0 (development)"
+TARGET_PLACEHOLDER = "Select a language..."
+QUALITY = {"Fast": 2, "Balanced": 3, "Accurate": 5}  # beam sizes
+RELEASES_URL = "https://github.com/ymoslem/DesktopTranslator/releases"
+DOWNLOADS = [
+    ("NLLB-200 distilled 600M", "200 languages; the smallest and fastest",
+     "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_distilled_600M_int8_ct2.zip"),
+    ("NLLB-200 distilled 1.2B", "200 languages; slower, needs more memory, sometimes more accurate",
+     "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_distilled_1.2B_int8_ct2.zip"),
+    ("M2M-100 418M", "100 languages; small",
+     "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.1/M2M-100_418m_parameter_model_ct2.zip"),
+    ("M2M-100 1.2B", "100 languages; larger",
+     "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.1/M2M-100_12b_parameter_model_ct2.zip"),
+    ("French to English", "A small model to try the app",
+     "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.3/fren.zip"),
+]
 
 
 class Worker(QThread):
+    """Translates in the background, and reports with signals"""
+
     progress = Signal(int)
     done = Signal(list)
     cancelled = Signal()
@@ -52,152 +91,485 @@ class Worker(QThread):
             self.failed.emit(str(error))
 
 
+class SourceEdit(QTextEdit):
+    """The source text; a text file can be dropped on it"""
+
+    file_dropped = Signal(str)
+
+    def canInsertFromMimeData(self, source):
+        return source.hasUrls() or super().canInsertFromMimeData(source)
+
+    def insertFromMimeData(self, source):
+        if source.hasUrls() and source.urls()[0].isLocalFile():
+            self.file_dropped.emit(source.urls()[0].toLocalFile())
+        else:
+            super().insertFromMimeData(source)
+
+
+class LanguageBox(QComboBox):
+    """A language list that can be searched by typing"""
+
+    def __init__(self):
+        super().__init__()
+        self.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self.setMinimumContentsLength(22)
+        self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+
+    def set_languages(self, items, searchable):
+        self.blockSignals(True)
+        self.clear()
+        self.addItems(items)
+        self.setEditable(searchable)
+        if searchable:
+            completer = QCompleter(items, self)
+            completer.setFilterMode(Qt.MatchFlag.MatchContains)
+            completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+            self.setCompleter(completer)
+        self.blockSignals(False)
+
+    def choose(self, text):
+        """Select an entry by its name; returns False if there is no such entry"""
+        index = self.findText(text, Qt.MatchFlag.MatchFixedString)
+        if index < 0:
+            return False
+        self.setCurrentIndex(index)
+        return True
+
+
+class PreferencesDialog(QDialog):
+    def __init__(self, parent, beam_size, join_lines, remember):
+        super().__init__(parent)
+        self.setWindowTitle("Preferences")
+        self.quality = QComboBox()
+        self.quality.addItems(QUALITY)
+        self.quality.setCurrentText(next((n for n, b in QUALITY.items() if b == beam_size), "Balanced"))
+        self.quality.setToolTip("Fast takes less time; Accurate searches more candidate translations (a larger beam size)")
+        self.join_lines = QCheckBox("Join lines inside a paragraph (for text from PDF or OCR)")
+        self.join_lines.setChecked(join_lines)
+        self.remember = QCheckBox("Remember the last model and target language")
+        self.remember.setChecked(remember)
+        form = QFormLayout()
+        form.addRow("Translation quality:", self.quality)
+        form.addRow(self.join_lines)
+        form.addRow(self.remember)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout = QVBoxLayout(self)
+        layout.addLayout(form)
+        layout.addWidget(buttons)
+
+    def values(self):
+        return QUALITY[self.quality.currentText()], self.join_lines.isChecked(), self.remember.isChecked()
+
+
 class Window(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("DesktopTranslator (Qt prototype)")
+        self.setWindowTitle(APP_NAME)
         self.engine = Engine()
+        self.preferences = Preferences()
         self.worker = None
         self.translation = ""
+        self.file_name = ""
+        self.pending_model = ""  # the models of the last session are loaded when translating
+        self.pending_sp = ""
+        self.sp_path = ""
+        self.detected_name = ""
 
-        self.model_button = QPushButton("CTranslate2 Model")
-        self.sp_button = QPushButton("SentencePiece Model")
+        self.build_widgets()
+        self.build_menus()
+        self.restore_session()
+
+    # Interface
+
+    def build_widgets(self):
+        self.model_button = QPushButton("Open Model...")
+        self.model_button.setToolTip("Open a CTranslate2 model folder (Ctrl+M)")
         self.translate_button = QPushButton("Translate")
-        self.source_combo = QComboBox()
-        self.target_combo = QComboBox()
-        self.source_combo.addItem(AUTO_DETECT)
-        self.target_combo.addItem("Load a model first")
-        self.source_combo.setEnabled(False)
-        self.target_combo.setEnabled(False)
+        self.translate_button.setDefault(True)
+        self.translate_button.setToolTip("Translate the source text (Ctrl+Return)")
+        self.source_combo, self.target_combo = LanguageBox(), LanguageBox()
+        self.swap_button = QPushButton("⇄")
+        self.swap_button.setFixedWidth(40)
+        self.swap_button.setToolTip("Swap the source and target languages (Ctrl+Shift+S)")
         self.source_header = QLabel("Source")
         self.copy_button = QPushButton("Copy")
-        self.source_text = QTextEdit()
+        self.copy_button.setToolTip("Copy the translation (Ctrl+Shift+C)")
+        self.source_text = SourceEdit()
         self.target_text = QTextEdit()
+        self.source_text.setPlaceholderText("Type or paste text here, drop a text file on it, or choose File > Open Text.")
+        self.target_text.setPlaceholderText("The translation appears here.")
         for pane in (self.source_text, self.target_text):
-            pane.setFontPointSize(14)
             pane.setAcceptRichText(False)
+            pane.setFontPointSize(14)
             # Each paragraph takes its direction from its first strong character
             option = pane.document().defaultTextOption()
             option.setTextDirection(Qt.LayoutDirection.LayoutDirectionAuto)
             pane.document().setDefaultTextOption(option)
+        self.set_languages(None)
 
         top = QHBoxLayout()
-        for widget in (self.model_button, self.sp_button, self.translate_button):
-            top.addWidget(widget)
+        top.addWidget(self.model_button)
+        top.addWidget(self.translate_button)
+        top.addSpacing(16)
+        top.addWidget(QLabel("From:"))
+        top.addWidget(self.source_combo)
+        top.addWidget(self.swap_button)
+        top.addWidget(QLabel("To:"))
+        top.addWidget(self.target_combo)
         top.addStretch()
-        second = QHBoxLayout()
-        for widget in (QLabel("Source language:"), self.source_combo, QLabel("Target language:"), self.target_combo):
-            second.addWidget(widget)
-        second.addStretch()
-        headers = QHBoxLayout()
-        headers.addWidget(self.source_header, 1)
-        headers.addWidget(QLabel("Translation"), 1)
-        headers.addWidget(self.copy_button)
-        panes = QHBoxLayout()
-        panes.addWidget(self.source_text)
-        panes.addWidget(self.target_text)
+
+        def pane_with_header(header, pane, button=None):
+            row = QHBoxLayout()
+            row.addWidget(header, 1)
+            if button:
+                row.addWidget(button)
+            column = QVBoxLayout()
+            column.setContentsMargins(0, 0, 0, 0)
+            column.addLayout(row)
+            column.addWidget(pane)
+            holder = QWidget()
+            holder.setLayout(column)
+            return holder
+
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.splitter.addWidget(pane_with_header(self.source_header, self.source_text))
+        self.splitter.addWidget(pane_with_header(QLabel("Translation"), self.target_text, self.copy_button))
+        self.splitter.setChildrenCollapsible(False)
         layout = QVBoxLayout()
-        for part in (top, second, headers, panes):
-            layout.addLayout(part)
+        layout.addLayout(top)
+        layout.addWidget(self.splitter)
         central = QWidget()
         central.setLayout(layout)
         self.setCentralWidget(central)
-        self.statusBar().showMessage("Select a model and enter text to translate!")
 
-        self.model_button.clicked.connect(self.choose_model)
-        self.sp_button.clicked.connect(self.choose_sp_model)
+        self.model_label = QLabel()
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setFixedWidth(160)
+        self.progress_bar.hide()
+        self.statusBar().addPermanentWidget(self.progress_bar)
+        self.statusBar().addPermanentWidget(self.model_label)
+        self.statusBar().showMessage("Open a model to start, or choose Help > Get Models.")
+
+        self.model_button.clicked.connect(self.open_model)
         self.translate_button.clicked.connect(self.translate_or_cancel)
-        self.copy_button.clicked.connect(lambda: QApplication.clipboard().setText(self.translation))
-        self.source_combo.currentTextChanged.connect(lambda _: self.update_direction())
+        self.swap_button.clicked.connect(self.swap_languages)
+        self.copy_button.clicked.connect(self.copy_translation)
+        self.source_text.file_dropped.connect(self.open_text_file)
+        self.source_combo.activated.connect(lambda _: self.update_header())
+        self.target_combo.activated.connect(lambda _: self.remember_target())
+
+    def action(self, menu, text, slot, shortcut=None, enabled=True):
+        action = QAction(text, self)
+        if shortcut is not None:
+            action.setShortcut(QKeySequence(shortcut))
+        action.triggered.connect(slot)
+        action.setEnabled(enabled)
+        menu.addAction(action)
+        return action
+
+    def build_menus(self):
+        bar = self.menuBar()
+        file_menu = bar.addMenu("&File")
+        self.action(file_menu, "Open Text...", self.open_text, QKeySequence.StandardKey.Open)
+        self.action(file_menu, "Reopen Text with Encoding...", self.reopen_with_encoding)
+        self.action(file_menu, "Save Translation...", self.save_translation, QKeySequence.StandardKey.Save)
+        file_menu.addSeparator()
+        self.action(file_menu, "Quit", self.close, QKeySequence.StandardKey.Quit)
+
+        edit_menu = bar.addMenu("&Edit")
+        self.action(edit_menu, "Undo", lambda: self.focused_pane().undo(), QKeySequence.StandardKey.Undo)
+        self.action(edit_menu, "Redo", lambda: self.focused_pane().redo(), QKeySequence.StandardKey.Redo)
+        edit_menu.addSeparator()
+        self.action(edit_menu, "Cut", lambda: self.focused_pane().cut(), QKeySequence.StandardKey.Cut)
+        self.action(edit_menu, "Copy", lambda: self.focused_pane().copy(), QKeySequence.StandardKey.Copy)
+        self.action(edit_menu, "Paste", lambda: self.focused_pane().paste(), QKeySequence.StandardKey.Paste)
+        self.action(edit_menu, "Select All", lambda: self.focused_pane().selectAll(), QKeySequence.StandardKey.SelectAll)
+        edit_menu.addSeparator()
+        self.action(edit_menu, "Clear", self.clear)
+        edit_menu.addSeparator()
+        self.action(edit_menu, "Preferences...", self.show_preferences, QKeySequence.StandardKey.Preferences)
+
+        translate_menu = bar.addMenu("&Translate")
+        self.action(translate_menu, "Translate", self.translate_or_cancel, "Ctrl+Return")
+        self.cancel_action = self.action(translate_menu, "Cancel", self.cancel, "Esc", enabled=False)
+        translate_menu.addSeparator()
+        self.action(translate_menu, "Open Model...", self.open_model, "Ctrl+M")
+        self.action(translate_menu, "Choose SentencePiece Model...", self.choose_sp_model)
+        translate_menu.addSeparator()
+        self.action(translate_menu, "Swap Languages", self.swap_languages, "Ctrl+Shift+S")
+        self.action(translate_menu, "Copy Translation", self.copy_translation, "Ctrl+Shift+C")
+
+        view_menu = bar.addMenu("&View")
+        self.action(view_menu, "Larger Text", lambda: self.zoom(1), QKeySequence.StandardKey.ZoomIn)
+        self.action(view_menu, "Smaller Text", lambda: self.zoom(-1), QKeySequence.StandardKey.ZoomOut)
+
+        help_menu = bar.addMenu("&Help")
+        self.action(help_menu, "Get Models...", self.show_models)
+        self.action(help_menu, "About " + APP_NAME, self.show_about)
+
+    def focused_pane(self):
+        return self.target_text if self.target_text.hasFocus() else self.source_text
+
+    def zoom(self, step):
+        for pane in (self.source_text, self.target_text):
+            pane.zoomIn(step) if step > 0 else pane.zoomOut(-step)
+
+    # Languages
+
+    def set_languages(self, model_type):
+        """Fill the language lists for the kind of model"""
+        if model_type in self.engine.language_lists:
+            names = sorted(self.engine.language_codes)
+            self.source_combo.set_languages([AUTO_DETECT] + names, True)
+            self.target_combo.set_languages(names, True)
+            self.target_combo.setCurrentIndex(-1)
+            self.target_combo.lineEdit().setPlaceholderText(TARGET_PLACEHOLDER)
+            for widget in (self.source_combo, self.target_combo, self.swap_button):
+                widget.setEnabled(True)
+        else:
+            self.source_combo.set_languages([AUTO_DETECT], False)
+            self.target_combo.set_languages(["Not needed" if model_type else "Open a model first"], False)
+            for widget in (self.source_combo, self.target_combo, self.swap_button):
+                widget.setEnabled(False)
+
+    def selected_source(self):
+        text = self.source_combo.currentText()
+        return text if text in self.engine.language_codes else AUTO_DETECT
+
+    def selected_target(self):
+        text = self.target_combo.currentText()
+        return text if text in self.engine.language_codes else ""
+
+    def remember_target(self):
+        if self.selected_target():
+            self.preferences.target_memory[self.engine.model_type] = self.selected_target()
+            self.save_settings()
+
+    def swap_languages(self):
+        source = self.selected_source()
+        if source == AUTO_DETECT:
+            source = self.detected_name
+        target = self.selected_target()
+        if not source or not target:
+            self.statusBar().showMessage("Choose the two languages, or translate once, to swap them.")
+            return
+        self.source_combo.choose(target)
+        self.target_combo.choose(source)
+        self.update_header()
+        self.remember_target()
+
+    def update_header(self):
+        self.source_header.setText("Source" if self.selected_source() != AUTO_DETECT else "Source (Auto detect)")
 
     # Models
 
-    def choose_model(self):
-        model_dir = QFileDialog.getExistingDirectory(self, "Select the CTranslate2 model folder")
-        if model_dir:
-            self.load_model(model_dir)
+    def open_model(self):
+        start = os.path.dirname(self.engine.model_dir or self.pending_model or "")
+        model_dir = QFileDialog.getExistingDirectory(self, "Open a CTranslate2 model folder", start)
+        if not model_dir or not self.load_model(model_dir):
+            return
+        candidates = find_sentencepiece(model_dir)
+        if len(candidates) == 1:
+            self.use_sp_model(candidates[0])
+        else:
+            self.choose_sp_model(os.path.dirname(candidates[0]) if candidates else model_dir, many=bool(candidates))
+
+    def choose_sp_model(self, start=None, many=False):
+        if not isinstance(start, str):
+            start = os.path.dirname(self.sp_path or self.pending_sp or self.engine.model_dir or "")
+        title = "Choose the SentencePiece model of the source language" if many else "Choose the SentencePiece model"
+        path, _ = QFileDialog.getOpenFileName(self, title, start, "SentencePiece model (*.model *.spm);;All files (*)")
+        if path:
+            self.use_sp_model(path)
+
+    def use_sp_model(self, path):
+        self.engine.load_sp_model(path)
+        self.sp_path = path
+        self.pending_sp = ""
+        self.statusBar().showMessage("Model loaded: " + self.engine.model_dir)
+        self.save_settings()
 
     def load_model(self, model_dir):
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
             changed = self.engine.load_model(model_dir)
         except EngineError as error:
             QMessageBox.critical(self, error.title, error.message)
+            return False
+        finally:
+            QApplication.restoreOverrideCursor()
+        self.pending_model = ""
+        if changed:
+            self.set_languages(self.engine.model_type)
+            self.restore_target()
+        self.model_label.setText("Model: " + os.path.basename(model_dir))
+        self.save_settings()
+        return True
+
+    def restore_target(self):
+        remember = self.preferences.get("remember_model_paths", True)
+        remembered = self.preferences.remembered_target(self.engine.model_type, remember)
+        if remembered and self.engine.model_type in self.engine.language_lists:
+            self.target_combo.choose(remembered)
+
+    def restore_session(self):
+        geometry = self.preferences.get("geometry", "")
+        if geometry:
+            self.restoreGeometry(QByteArray.fromBase64(geometry.encode()))
+        else:
+            self.resize(1200, 640)
+        state = self.preferences.get("splitter", "")
+        if state:
+            self.splitter.restoreState(QByteArray.fromBase64(state.encode()))
+        if not self.preferences.get("remember_model_paths", True):
             return
-        if self.engine.model_type in self.engine.language_lists:
-            names = sorted(self.engine.language_codes)
-            if changed:
-                self.target_combo.clear()
-                self.target_combo.addItem(PLACEHOLDER)
-                self.target_combo.addItems(names)
-                self.source_combo.clear()
-                self.source_combo.addItem(AUTO_DETECT)
-                self.source_combo.addItems(names)
-            self.target_combo.setEnabled(True)
-            self.source_combo.setEnabled(True)
-        else:
-            self.target_combo.clear()
-            self.target_combo.addItem("Not needed")
-            self.source_combo.clear()
-            self.source_combo.addItem(AUTO_DETECT)
-            self.target_combo.setEnabled(False)
-            self.source_combo.setEnabled(False)
-        self.statusBar().showMessage("Model: " + os.path.basename(model_dir))
+        model_dir, sp_path = self.preferences.get("ct2_model", ""), self.preferences.get("sp_model", "")
+        if self.engine.is_model(model_dir):
+            self.engine.inspect_model(model_dir)
+            self.set_languages(self.engine.model_type)
+            self.restore_target()
+            self.pending_model = model_dir
+            self.model_label.setText("Model: " + os.path.basename(model_dir))
+            self.statusBar().showMessage("Last used model: " + os.path.basename(model_dir) + " (loaded when you click Translate)")
+        if os.path.isfile(sp_path):
+            self.pending_sp = sp_path
 
-    def choose_sp_model(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Select the SentencePiece model file", "", "SentencePiece Model (*.model)")
+    def ensure_loaded(self):
+        """Load the models of the last session, when they are needed"""
+        if self.pending_model and not self.load_model(self.pending_model):
+            self.pending_model = ""
+            return False
+        if self.pending_sp:
+            self.use_sp_model(self.pending_sp)
+        return self.engine.translator is not None and self.engine.sp_model is not None
+
+    def save_settings(self):
+        self.preferences.save(
+            remember=self.preferences.get("remember_model_paths", True),
+            join_lines_option=self.preferences.get("join_lines", False),
+            rtl_view=True,
+            ct2_model=self.engine.model_dir or self.pending_model,
+            sp_model=self.sp_path or self.pending_sp,
+            model_type=self.engine.model_type if self.engine.model_type in self.engine.language_lists else None,
+            target=self.selected_target() or None,
+        )
+
+    # Text files
+
+    def confirm_long_lines(self, text):
+        longest = longest_line(text)
+        if longest <= LONG_LINE_CHARS:
+            return True
+        answer = QMessageBox.question(
+            self, "Very long line",
+            "The text has a line of " + format(longest, ",") + " characters. Showing it can be slow. Show it anyway?",
+        )
+        return answer == QMessageBox.StandardButton.Yes
+
+    def open_text(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Open a text file", os.path.dirname(self.file_name), "Text files (*.txt);;All files (*)")
         if path:
-            self.engine.load_sp_model(path)
+            self.open_text_file(path)
 
-    # Direction of the source pane
+    def open_text_file(self, path, encoding=None):
+        try:
+            text, encoding = read_text_file(path, encoding)
+        except (LookupError, UnicodeError, OSError) as error:
+            QMessageBox.critical(self, "Cannot open the file", str(error))
+            return
+        if not self.confirm_long_lines(text):
+            return
+        self.file_name = path
+        self.source_text.setPlainText(text)
+        self.statusBar().showMessage("%d lines, %d words, encoding %s" % (text.count("\n") + 1, len(text.split()), encoding))
 
-    def update_direction(self):
-        text = self.source_text.toPlainText()
-        selected = self.source_combo.currentText()
-        if selected != AUTO_DETECT and selected in self.engine.language_codes:
-            rtl = is_rtl_target(self.engine.model_type, self.engine.language_codes[selected])
-        elif len(text.strip()) > 1:
-            codes = self.engine.detect_language(text)
-            rtl = bool(codes) and is_rtl_language(codes[0])
+    def reopen_with_encoding(self):
+        if not self.file_name:
+            QMessageBox.information(self, "Reopen Text with Encoding", "Please open a text file first.")
+            return
+        encoding, accepted = QInputDialog.getText(self, "Reopen Text with Encoding", "Encoding, e.g. utf-8, utf-16, latin-1, cp1252:")
+        if accepted and encoding.strip():
+            self.open_text_file(self.file_name, encoding.strip())
+
+    def save_translation(self):
+        if not self.translation.strip():
+            QMessageBox.information(self, "Save Translation", "There is nothing to save.")
+            return
+        path, _ = QFileDialog.getSaveFileName(self, "Save the translation", os.path.dirname(self.file_name), "Text files (*.txt)")
+        if path:
+            write_text_file(path, self.target_text.toPlainText())
+
+    def copy_translation(self):
+        text = self.target_text.toPlainText()
+        if text.strip():
+            QApplication.clipboard().setText(text)
+            self.statusBar().showMessage("Translation copied to the clipboard.")
         else:
-            rtl = False
-        return rtl
+            self.statusBar().showMessage("Nothing to copy.")
+
+    def clear(self):
+        self.source_text.clear()
+        self.target_text.clear()
+        self.translation = ""
+        self.source_header.setText("Source")
 
     # Translation
 
     def translate_or_cancel(self):
         if self.worker is not None:
-            self.worker.cancel = True
+            self.cancel()
             return
         text = self.source_text.toPlainText()
-        if self.engine.translator is None or self.engine.sp_model is None or not text.strip():
-            QMessageBox.critical(self, "No model selected", "Please select both models, and enter text to translate.")
+        if not text.strip():
+            self.statusBar().showMessage("Enter some text to translate.")
+            return
+        if not self.ensure_loaded():
+            QMessageBox.critical(self, "No model", "Please open a model first (Translate > Open Model).")
             return
         try:
-            target = self.engine.target_language(self.target_combo.currentText())
+            target = self.engine.target_language(self.selected_target())
         except EngineError as error:
             QMessageBox.critical(self, error.title, error.message)
             return
-        source_code, prefix = self.engine.source_language(text, self.source_combo.currentText())
+        source = self.selected_source()
+        source_code, prefix = self.engine.source_language(text, source)
         if source_code is None:
-            QMessageBox.critical(self, "Source language", "The source language is not supported or not recognized.")
+            QMessageBox.critical(
+                self, "Source language",
+                "The source language is not supported or not recognized. Add more text, or select the source language.",
+            )
             return
-        if self.source_combo.currentText() == AUTO_DETECT:
-            self.source_header.setText("Source (detected: " + source_code + ")")
-        self.sentences, self.breaks, batches, self.total_words = self.engine.split(text, source_code)
+        reverse = {v: k for k, v in self.engine.language_codes.items()}
+        self.detected_name = reverse.get(prefix, "")
+        self.source_header.setText("Source (detected: " + source_code + ")" if source == AUTO_DETECT else "Source")
+        self.sentences, self.breaks, batches, self.total_words = self.engine.split(
+            text, source_code, self.preferences.get("join_lines", False)
+        )
         self.start = time.time()
-        self.worker = Worker(self.engine, batches, 3, target, prefix)
+        self.worker = Worker(self.engine, batches, self.preferences.get("beam_size", 3), target, prefix)
         self.worker.progress.connect(self.on_progress)
         self.worker.done.connect(self.on_done)
         self.worker.cancelled.connect(lambda: self.finish("Translation cancelled."))
         self.worker.failed.connect(lambda message: self.finish("Translation failed: " + message))
+        self.progress_bar.setRange(0, self.total_words)
+        self.progress_bar.setValue(0)
+        self.progress_bar.show()
         self.translate_button.setText("Cancel")
-        self.target_is_rtl = is_rtl_target(self.engine.model_type, target)
+        self.cancel_action.setEnabled(True)
         self.worker.start()
 
+    def cancel(self):
+        if self.worker is not None:
+            self.worker.cancel = True
+            self.statusBar().showMessage("Cancelling...")
+
     def on_progress(self, words_done):
+        self.progress_bar.setValue(words_done)
         status = "Translating... " + str(int(100 * words_done / self.total_words)) + "%"
         elapsed = time.time() - self.start
-        if elapsed > 3:
+        if elapsed > 3 and words_done:
             status += " (about " + format_duration(elapsed * (self.total_words - words_done) / words_done) + " left)"
         self.statusBar().showMessage(status)
 
@@ -209,26 +581,79 @@ class Window(QMainWindow):
     def finish(self, message):
         self.worker.wait()
         self.worker = None
+        self.progress_bar.hide()
         self.translate_button.setText("Translate")
+        self.cancel_action.setEnabled(False)
         self.statusBar().showMessage(message)
+
+    # Windows
+
+    def show_preferences(self):
+        dialog = PreferencesDialog(
+            self, self.preferences.get("beam_size", 3), self.preferences.get("join_lines", False),
+            self.preferences.get("remember_model_paths", True),
+        )
+        if dialog.exec():
+            beam_size, join_lines, remember = dialog.values()
+            self.preferences.set("beam_size", beam_size)
+            self.preferences.set("join_lines", join_lines)
+            self.preferences.set("remember_model_paths", remember)
+            self.save_settings()
+
+    def show_models(self):
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Get Models")
+        layout = QVBoxLayout(dialog)
+        layout.addWidget(QLabel("Download a model, extract the archive, and open its folder with Translate > Open Model."))
+        for name, description, url in DOWNLOADS:
+            row = QHBoxLayout()
+            button = QPushButton("Download")
+            button.clicked.connect(lambda _=False, url=url: QDesktopServices.openUrl(QUrl(url)))
+            row.addWidget(QLabel("<b>" + name + "</b><br>" + description), 1)
+            row.addWidget(button)
+            layout.addLayout(row)
+        more = QPushButton("More releases...")
+        more.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(RELEASES_URL)))
+        layout.addWidget(more)
+        dialog.exec()
+
+    def show_about(self):
+        QMessageBox.about(
+            self, "About " + APP_NAME,
+            "<h3>" + APP_NAME + "</h3>Version " + VERSION + "<br>Developed by Yasmin Moslem<br>"
+            "<a href='https://www.machinetranslation.io'>www.machinetranslation.io</a>"
+            "<p>Translation with CTranslate2 and SentencePiece. Released under the MIT license.</p>"
+            "<p>The interface uses Qt for Python (PySide6), available under the "
+            "<a href='https://www.gnu.org/licenses/lgpl-3.0.html'>LGPL v3</a>. "
+            "The source of Qt is at <a href='https://code.qt.io'>code.qt.io</a>.</p>",
+        )
+
+    def closeEvent(self, event):
+        self.preferences.set("geometry", bytes(self.saveGeometry().toBase64()).decode())
+        self.preferences.set("splitter", bytes(self.splitter.saveState().toBase64()).decode())
+        self.preferences.write()
+        super().closeEvent(event)
 
 
 def main():
     app = QApplication(sys.argv)
+    app.setApplicationName(APP_NAME)
+    icon = os.path.join(DATA_DIR, "img", "icon.png")
+    if os.path.isfile(icon):
+        app.setWindowIcon(QIcon(icon))
     if "--dark" in sys.argv:  # to test the dark appearance; by default the system setting is used
         sys.argv.remove("--dark")
         app.styleHints().setColorScheme(Qt.ColorScheme.Dark)
     window = Window()
-    window.resize(1200, 640)
     window.show()
     if len(sys.argv) > 1 and sys.argv[1] == "--demo":
         model_dir, sp_model, target, text_file, output = sys.argv[2:7]
 
         def start():
             window.load_model(model_dir)
-            window.engine.load_sp_model(sp_model)
+            window.use_sp_model(sp_model)
             window.source_text.setPlainText(open(text_file, encoding="utf-8").read())
-            window.target_combo.setCurrentText(target)
+            window.target_combo.choose(target)
             window.translate_or_cancel()
 
         def grab_when_done():
