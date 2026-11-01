@@ -9,6 +9,7 @@ from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtGui import QColor, QFont, QGuiApplication, QImage, QLinearGradient, QPainter, QPainterPath, QPen
 
 SIZE = 1024
+BOLD = True  # the Arabic letter is as heavy as the bold A
 
 
 def bubble(painter, rect, tail_left, fill):
@@ -55,6 +56,7 @@ def main(output, letter="ع", font_name="Geeza Pro"):
     painter.drawText(QRectF(140, 190, 360, 380), Qt.AlignmentFlag.AlignCenter, "A")
     arabic = QFont(font_name, 1)
     arabic.setPixelSize(300)
+    arabic.setBold(BOLD)
     painter.setFont(arabic)
     painter.setPen(QColor("#7c2d12"))
     painter.drawText(QRectF(400, 400, 470, 380), Qt.AlignmentFlag.AlignCenter, letter)
