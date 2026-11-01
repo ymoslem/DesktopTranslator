@@ -541,9 +541,10 @@ class TranslatorGUI:
                     source_sents_tok = self.sp_source_model.encode(
                         split, out_type=str
                     )
-                    source_sents_tok = [
-                        [src_prefix] + sent for sent in source_sents_tok
-                    ]
+                    if src_prefix != "":
+                        source_sents_tok = [
+                            [src_prefix] + sent for sent in source_sents_tok
+                        ]
 
                     translations_tok = self.translator.translate_batch(
                         source=source_sents_tok,
