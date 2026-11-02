@@ -196,6 +196,19 @@ check(0 <= header_top - top_row_bottom <= 24, "the headers are close to the tool
 centre = lambda label: label.mapTo(window, label.rect().center()).y()
 check(abs(centre(window.source_header) - centre(window.target_header)) <= 1, "both headers are centred on the same line")
 
+# The repetition penalty is off by default, and a preference turns it on
+penalties = []
+real_translate_batch = window.engine.translate_batch
+window.engine.translate_batch = lambda *a, **k: (penalties.append(a[4] if len(a) > 4 else k.get("repetition_penalty")), real_translate_batch(*a, **k))[1]
+translate(window, "The committee approved the new budget.", target="French")
+check(penalties and set(penalties) == {1.0}, "no repetition penalty by default: " + str(set(penalties)))
+penalties.clear()
+window.preferences.set("repetition_penalty", 1.2)
+translate(window, "The committee approved the new budget.")
+check(penalties and set(penalties) == {1.2}, "the preference turns on the penalty of 1.2: " + str(set(penalties)))
+window.preferences.set("repetition_penalty", 1.0)
+window.engine.translate_batch = real_translate_batch
+
 # Text size and the menus
 sizes = [window.source_text.font().pointSize()]
 for name in ("Larger Text", "Larger Text", "Smaller Text", "Actual Size"):
@@ -222,8 +235,8 @@ output = translate(window, "The committee approved the new budget.")
 check(output.startswith("Le comité") and window.engine.translator is not None, "the model is loaded when translating: " + repr(output))
 text = "The committee met on Monday to discuss the\nnew budget and decided to approve it\nafter a long debate."
 check("\n" not in translate(window, text), "Join Lines from the preferences joins the lines")
-dialog = qt_app.PreferencesDialog(window, 5, True, False)
-check(dialog.values() == (5, True, False), "the preferences window shows the saved values")
+dialog = qt_app.PreferencesDialog(window, 5, True, False, True)
+check(dialog.values() == (5, True, False, True), "the preferences window shows the saved values")
 window.close()
 print("\n%d failure(s)" % len(failures))
 sys.exit(1 if failures else 0)

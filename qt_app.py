@@ -36,6 +36,7 @@ from engine import (
     AUTO_DETECT,
     DATA_DIR,
     LONG_LINE_CHARS,
+    REPETITION_PENALTY,
     Engine,
     EngineError,
     Preferences,
@@ -86,10 +87,11 @@ class Worker(QThread):
     cancelled = Signal()
     failed = Signal(str)
 
-    def __init__(self, engine, batches, beam_size, target_lang_code, src_prefix):
+    def __init__(self, engine, batches, beam_size, target_lang_code, src_prefix, repetition_penalty):
         super().__init__()
         self.engine, self.batches = engine, batches
         self.beam_size, self.target_lang_code, self.src_prefix = beam_size, target_lang_code, src_prefix
+        self.repetition_penalty = repetition_penalty
         self.cancel = False
 
     def run(self):
@@ -97,6 +99,7 @@ class Worker(QThread):
             translations = self.engine.translate(
                 self.batches, self.beam_size, self.target_lang_code, self.src_prefix,
                 is_cancelled=lambda: self.cancel, on_progress=self.progress.emit,
+                repetition_penalty=self.repetition_penalty,
             )
             self.cancelled.emit() if translations is None else self.done.emit(translations)
         except Exception as error:
@@ -151,19 +154,22 @@ class LanguageBox(QComboBox):
 
 
 class PreferencesDialog(QDialog):
-    def __init__(self, parent, beam_size, join_lines, remember):
+    def __init__(self, parent, beam_size, join_lines, remember, repetition):
         super().__init__(parent)
         self.setWindowTitle("Preferences")
         self.quality = QComboBox()
         self.quality.addItems(QUALITY)
         self.quality.setCurrentText(next((n for n, b in QUALITY.items() if b == beam_size), "Balanced"))
         self.quality.setToolTip("Fast takes less time; Accurate searches more candidate translations (a larger beam size)")
+        self.repetition = QCheckBox("Avoid repeated words (a repetition penalty of 1.2; it scored lower in our tests)")
+        self.repetition.setChecked(repetition)
         self.join_lines = QCheckBox("Join lines inside a paragraph (for text from PDF or OCR)")
         self.join_lines.setChecked(join_lines)
         self.remember = QCheckBox("Remember the last model and target language")
         self.remember.setChecked(remember)
         form = QFormLayout()
         form.addRow("Translation quality:", self.quality)
+        form.addRow(self.repetition)
         form.addRow(self.join_lines)
         form.addRow(self.remember)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -174,7 +180,7 @@ class PreferencesDialog(QDialog):
         layout.addWidget(buttons)
 
     def values(self):
-        return QUALITY[self.quality.currentText()], self.join_lines.isChecked(), self.remember.isChecked()
+        return QUALITY[self.quality.currentText()], self.join_lines.isChecked(), self.remember.isChecked(), self.repetition.isChecked()
 
 
 class Window(QMainWindow):
@@ -618,7 +624,8 @@ class Window(QMainWindow):
             text, source_code, self.preferences.get("join_lines", False)
         )
         self.start = time.time()
-        self.worker = Worker(self.engine, batches, self.preferences.get("beam_size", 3), target, prefix)
+        penalty = REPETITION_PENALTY if self.preferences.get("repetition_penalty", 1.0) > 1.0 else 1.0
+        self.worker = Worker(self.engine, batches, self.preferences.get("beam_size", 3), target, prefix, penalty)
         self.worker.progress.connect(self.on_progress)
         self.worker.done.connect(self.on_done)
         self.worker.cancelled.connect(lambda: self.finish("Translation cancelled."))
@@ -661,10 +668,11 @@ class Window(QMainWindow):
     def show_preferences(self):
         dialog = PreferencesDialog(
             self, self.preferences.get("beam_size", 3), self.preferences.get("join_lines", False),
-            self.preferences.get("remember_model_paths", True),
+            self.preferences.get("remember_model_paths", True), self.preferences.get("repetition_penalty", 1.0) > 1.0,
         )
         if dialog.exec():
-            beam_size, join_lines, remember = dialog.values()
+            beam_size, join_lines, remember, repetition = dialog.values()
+            self.preferences.set("repetition_penalty", REPETITION_PENALTY if repetition else 1.0)
             self.preferences.set("beam_size", beam_size)
             self.preferences.set("join_lines", join_lines)
             self.preferences.set("remember_model_paths", remember)
