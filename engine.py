@@ -168,10 +168,10 @@ def memory_info():
 def memory_needed(model_dir):
     """Estimated memory to translate with a CTranslate2 model, in bytes
 
-    It is 1.3 times the size of the model file plus 1 GB, which covers the sentences of a normal text.
-    A very long sentence needs more, and a larger beam size slightly more."""
+    It is 1.3 times the size of the model file plus 1.7 GB, which covers the peaks measured with NLLB-200 models
+    (tests/memory_eval.py), translating with a beam size of 5. A very long sentence needs more."""
     size = os.path.getsize(os.path.join(model_dir, "model.bin")) if os.path.isfile(os.path.join(model_dir, "model.bin")) else 0
-    return int(1.3 * size + 1e9)
+    return int(1.3 * size + 1.7e9)
 
 
 def memory_warning(model_dir, info=None):
