@@ -194,6 +194,7 @@ class Window(QMainWindow):
         self.build_widgets()
         self.build_menus()
         self.restore_session()
+        self.source_text.setFocus()
 
     # Interface
 
@@ -238,6 +239,7 @@ class Window(QMainWindow):
         header_height = self.copy_button.sizeHint().height()
 
         def pane_with_header(header, pane, button=None):
+            header.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             row = QHBoxLayout()
             row.setContentsMargins(0, 0, 0, 0)
             row.addWidget(header, 1)
@@ -248,6 +250,7 @@ class Window(QMainWindow):
             bar.setFixedHeight(header_height)  # both headers have the same height, so the panes line up
             column = QVBoxLayout()
             column.setContentsMargins(0, 0, 0, 0)
+            column.setSpacing(4)
             column.addWidget(bar)
             column.addWidget(pane)
             holder = QWidget()
@@ -256,9 +259,12 @@ class Window(QMainWindow):
 
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
         self.splitter.addWidget(pane_with_header(self.source_header, self.source_text))
-        self.splitter.addWidget(pane_with_header(QLabel("Translation"), self.target_text, self.copy_button))
+        self.target_header = QLabel("Translation")
+        self.splitter.addWidget(pane_with_header(self.target_header, self.target_text, self.copy_button))
         self.splitter.setChildrenCollapsible(False)
         layout = QVBoxLayout()
+        layout.setSpacing(4)
+        layout.setContentsMargins(10, 8, 10, 4)
         layout.addLayout(top)
         layout.addWidget(self.splitter)
         central = QWidget()
@@ -266,6 +272,11 @@ class Window(QMainWindow):
         self.setCentralWidget(central)
 
         self.model_label = QLabel()
+        self.count_label = QLabel()
+        self.count_timer = QTimer(self)  # counts a moment after the last change, so typing stays quick
+        self.count_timer.setSingleShot(True)
+        self.count_timer.setInterval(300)
+        self.count_timer.timeout.connect(self.update_word_count)
         self.progress_bar = QProgressBar()
         self.progress_bar.setFixedWidth(160)
         self.progress_bar.hide()
@@ -273,8 +284,10 @@ class Window(QMainWindow):
         self.status_label = QLabel()
         self.status_label.setContentsMargins(12, 2, 12, 2)
         self.model_label.setContentsMargins(12, 2, 12, 2)
+        self.count_label.setContentsMargins(12, 2, 12, 2)
         self.statusBar().addWidget(self.status_label, 1)
         self.statusBar().addPermanentWidget(self.progress_bar)
+        self.statusBar().addPermanentWidget(self.count_label)
         self.statusBar().addPermanentWidget(self.model_label)
         self.say("Open a model to start, or choose Help > Get Models.")
 
@@ -283,8 +296,13 @@ class Window(QMainWindow):
         self.swap_button.clicked.connect(self.swap_languages)
         self.copy_button.clicked.connect(self.copy_translation)
         self.source_text.file_dropped.connect(self.open_text_file)
+        self.source_text.textChanged.connect(self.count_timer.start)
         self.source_combo.activated.connect(lambda _: self.update_header())
         self.target_combo.activated.connect(lambda _: self.remember_target())
+
+    def update_word_count(self):
+        words = len(self.source_text.toPlainText().split())
+        self.count_label.setText(format(words, ",") + (" word" if words == 1 else " words") if words else "")
 
     def say(self, message):
         self.status_label.setText(message)
@@ -451,6 +469,7 @@ class Window(QMainWindow):
             self.set_languages(self.engine.model_type)
             self.restore_target()
         self.show_model_name(model_dir)
+        self.source_text.setFocus()
         self.save_settings()
         return True
 
@@ -594,7 +613,7 @@ class Window(QMainWindow):
             return
         reverse = {v: k for k, v in self.engine.language_codes.items()}
         self.detected_name = reverse.get(prefix, "")
-        self.source_header.setText("Source (detected: " + source_code + ")" if source == AUTO_DETECT else "Source")
+        self.source_header.setText("Source (detected: " + (self.detected_name or source_code) + ")" if source == AUTO_DETECT else "Source")
         self.sentences, self.breaks, batches, self.total_words = self.engine.split(
             text, source_code, self.preferences.get("join_lines", False)
         )

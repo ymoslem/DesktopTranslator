@@ -178,6 +178,24 @@ window.load_model(NLLB)
 window.target_combo.choose("French")
 QMessageBox.question = staticmethod(lambda *a, **k: (messages.append(a[2]), QMessageBox.StandardButton.No)[1])
 
+# The detected language by name, the word count, the focus, and the layout
+translate(window, "The committee approved the new budget after a long debate.", target="French", source="Auto detect")
+check(window.source_header.text() == "Source (detected: English)", "the detected language is shown by name: " + window.source_header.text())
+for text, expected in (("one two three", "3 words"), ("one", "1 word"), ("", ""), ("a, b" + " c" * 1200, "1,202 words")):
+    window.source_text.setPlainText(text)
+    deadline = time.time() + 3
+    while window.count_label.text() != expected and time.time() < deadline:
+        app.processEvents()
+        time.sleep(0.02)
+    check(window.count_label.text() == expected, "the word count shows %r: %r" % (expected, window.count_label.text()))
+window.load_model(NLLB)
+check(window.focusWidget() is window.source_text, "the cursor is in the source pane after opening a model")
+top_row_bottom = window.target_combo.mapTo(window, window.target_combo.rect().bottomLeft()).y()
+header_top = window.source_header.mapTo(window, window.source_header.rect().topLeft()).y()
+check(0 <= header_top - top_row_bottom <= 24, "the headers are close to the toolbar: %d px" % (header_top - top_row_bottom))
+centre = lambda label: label.mapTo(window, label.rect().center()).y()
+check(abs(centre(window.source_header) - centre(window.target_header)) <= 1, "both headers are centred on the same line")
+
 # Text size and the menus
 sizes = [window.source_text.font().pointSize()]
 for name in ("Larger Text", "Larger Text", "Smaller Text", "Actual Size"):
