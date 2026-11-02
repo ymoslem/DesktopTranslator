@@ -223,15 +223,17 @@ many = " ".join("The committee approved the new budget number %d after a long de
 window.source_text.setPlainText(many)
 window.target_combo.choose("French")
 window.translate_or_cancel()
-lengths, read_only = [], []
+lengths, read_only, copy_enabled = [], [], []
 started = time.time()
 while window.worker is not None and time.time() - started < 120:
     app.processEvents()
     if window.worker is not None:
         lengths.append(len(window.target_text.toPlainText()))
         read_only.append(window.target_text.isReadOnly())
+        copy_enabled.append(window.copy_button.isEnabled())
     time.sleep(0.02)
 check(any(0 < n < max(lengths) for n in lengths) and all(read_only), "the translation grows while it is made, and the pane is read-only meanwhile")
+check(copy_enabled and not any(copy_enabled) and window.copy_button.isEnabled(), "Copy is disabled while translating, and enabled after")
 check(not window.target_text.isReadOnly() and window.target_text.toPlainText().rstrip() == window.translation, "the final text is the translation, and the pane can be edited")
 window.source_text.setPlainText(many + " " + many)
 window.translate_or_cancel()

@@ -377,8 +377,13 @@ class Window(QMainWindow):
         self.status_label = QLabel()
         self.status_label.setContentsMargins(12, 2, 12, 2)
         self.model_label.setContentsMargins(12, 2, 12, 2)
-        self.statusBar().addWidget(self.status_label, 1)
-        self.statusBar().addPermanentWidget(self.progress_bar)
+        status = QWidget()  # the progress bar sits right after the status text
+        status_row = QHBoxLayout(status)
+        status_row.setContentsMargins(0, 0, 0, 0)
+        status_row.addWidget(self.status_label)
+        status_row.addWidget(self.progress_bar)
+        status_row.addStretch()
+        self.statusBar().addWidget(status, 1)
         self.statusBar().addPermanentWidget(self.model_label)
         self.say("Open a model to start, or choose Help > Get Models.")
 
@@ -676,6 +681,9 @@ class Window(QMainWindow):
             write_text_file(path, self.target_text.toPlainText())
 
     def copy_translation(self):
+        if self.worker is not None:
+            self.say("Copy is available when the translation is done.")
+            return
         text = self.target_text.toPlainText()
         if text.strip():
             QApplication.clipboard().setText(text)
@@ -740,6 +748,8 @@ class Window(QMainWindow):
         self.progress_bar.setValue(0)
         self.progress_bar.show()
         self.translate_button.setText("Cancel")
+        self.copy_button.setEnabled(False)
+        self.copy_button.setToolTip("Available when the translation is done")
         self.cancel_action.setEnabled(True)
         self.worker.start()
 
@@ -784,6 +794,8 @@ class Window(QMainWindow):
         self.worker = None
         self.progress_bar.hide()
         self.translate_button.setText("Translate")
+        self.copy_button.setEnabled(True)
+        self.copy_button.setToolTip("Copy the translation (Ctrl+Shift+C)")
         self.cancel_action.setEnabled(False)
         self.say(message)
 
