@@ -341,16 +341,23 @@ class Engine:
             translations.append("".join(tokens).replace("▁", " ").strip())
         return translations
 
+    def translate_new(self, batch, known, beam_size, target_lang_code, src_prefix, repetition_penalty):
+        """Translate the sentences of a batch that are not in known yet, so a repeated sentence is translated once"""
+        new = list(dict.fromkeys(sentence for sentence in batch if sentence not in known))
+        if new:
+            known.update(zip(new, self.translate_batch(new, beam_size, target_lang_code, src_prefix, repetition_penalty)))
+        return [known[sentence] for sentence in batch]
+
     def translate(self, batches, beam_size, target_lang_code, src_prefix, is_cancelled=lambda: False, on_progress=None, repetition_penalty=1.0, on_batch=None):
         """Translate the batches; returns the translated sentences, or None if cancelled
 
         on_progress gets the number of words done, and on_batch gets the sentences translated so far."""
-        translations = []
+        translations, known = [], {}
         words_done = 0
         for batch in batches:
             if is_cancelled():
                 return None
-            translations.extend(self.translate_batch(batch, beam_size, target_lang_code, src_prefix, repetition_penalty))
+            translations.extend(self.translate_new(batch, known, beam_size, target_lang_code, src_prefix, repetition_penalty))
             words_done += len(" ".join(batch).split())
             if on_batch:
                 on_batch(translations)
@@ -384,7 +391,7 @@ class Engine:
         if part:
             parts.append("".join(part))
 
-        words_done = 0
+        words_done, known = 0, {}
         with open(output_path, "w", encoding="utf-8") as output:
             for part_text in parts:
                 if is_cancelled():
@@ -400,7 +407,7 @@ class Engine:
                 for batch in batches:
                     if is_cancelled():
                         break
-                    translated.extend(self.translate_batch(batch, beam_size, target_lang_code, prefix, repetition_penalty))
+                    translated.extend(self.translate_new(batch, known, beam_size, target_lang_code, prefix, repetition_penalty))
                     output.write(builder.add(translated))
                     output.flush()
                     words_done += len(" ".join(batch).split())

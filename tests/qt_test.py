@@ -150,7 +150,7 @@ window.save_translation()
 check(messages and "nothing to save" in messages[-1][1].lower(), "an empty translation is not saved")
 
 # Cancelling, the progress bar and the time left
-long_text = " ".join(["The committee approved the new budget after a long debate in the main hall."] * 120)  # long enough to still be translating after 5 seconds
+long_text = " ".join("The committee approved the new budget number %d after a long debate in the main hall." % i for i in range(120))  # long enough to still be translating after 5 seconds
 window.source_text.setPlainText(long_text)
 window.target_combo.choose("French")
 window.translate_or_cancel()
@@ -219,7 +219,7 @@ for sentences, breaks in ((["A.", "B.", "C."], [0, 1, "\n", "\n", 2]), (["A.", "
     check(built.rstrip() == paragraph_detokenizer(sentences, breaks).rstrip(), "the text built step by step is the same: " + repr(built))
 
 # The translation is shown as it is produced, and a cancel keeps the translated part
-many = " ".join(["The committee approved the new budget after a long debate in the main hall."] * 30)
+many = " ".join("The committee approved the new budget number %d after a long debate in the main hall." % i for i in range(30))
 window.source_text.setPlainText(many)
 window.target_combo.choose("French")
 window.translate_or_cancel()
@@ -323,6 +323,16 @@ with open(cancelled_file, encoding="utf-8") as file:
 check(0 < len(partial_document) < len(expected) and expected.startswith(partial_document.rstrip()) and "Cancelled" in window.status_label.text(),
       "a cancelled document keeps the translated part: %d of %d characters" % (len(partial_document), len(expected)))
 engine_module.DOCUMENT_LINES = 200
+
+# A repeated sentence is translated once, and gets the same translation everywhere
+sentences = ["The committee approved the new budget.", "It will meet again next month.", "The committee approved the new budget."] * 6
+batches = [sentences[i : i + 8] for i in range(0, len(sentences), 8)]
+sent, real = [], window.engine.translate_batch
+window.engine.translate_batch = lambda batch, *args, **kw: (sent.extend(batch), real(batch, *args, **kw))[1]
+translated = window.engine.translate(batches, 3, window.engine.target_language("French"), "eng_Latn")
+window.engine.translate_batch = real
+check(len(translated) == len(sentences) and len(sent) == 2 and len(set(translated[0::3])) == 1 and translated[0] == translated[2],
+      "repeated sentences are translated once: %d of %d sentences sent to the model" % (len(sent), len(sentences)))
 messages.clear()
 QFileDialog.getSaveFileName = staticmethod(lambda *a, **k: (document, ""))
 window.translate_document(document)
