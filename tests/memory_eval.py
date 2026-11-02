@@ -8,8 +8,8 @@ its own process: the peak memory after loading it, and after translating 100 sen
 sizes 3 and 5. The script fails if the peak is higher than the estimate of engine.memory_needed.
 
 Peaks measured on a Mac with Apple silicon, in GB, as beam 3 and beam 5 (the estimate is 1.3 times the model file plus 1.7 GB)
-  NLLB-200 distilled 600M  2.03, 2.23  (estimate 2.50)
-  NLLB-200 distilled 1.3B  2.89, 3.33  (estimate 3.49)
+  NLLB-200 distilled 600M  2.03, 2.23  (estimate 2.51)
+  NLLB-200 distilled 1.3B  2.89, 3.33  (estimate 3.50)
   NLLB-200 3.3B            5.74, 5.99  (estimate 6.07)
 """
 import json
