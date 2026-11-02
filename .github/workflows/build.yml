@@ -26,9 +26,11 @@ jobs:
           - os: macos-latest
             name: macOS
             separator: ":"
+            icon: img/icon-macos.png
           - os: windows-latest
             name: Windows
             separator: ";"
+            icon: img/icon.png
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -44,22 +46,23 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -r requirements.txt pyinstaller==6.22.3
+          pip install -r requirements.txt pyinstaller==6.22.3 Pillow==13.0.0
 
       - name: Build the app
         run: |
           pyinstaller -y --windowed --name DesktopTranslator \
             --add-data "utils${{ matrix.separator }}utils" \
+            --add-data "img/icon.png${{ matrix.separator }}img" \
             --add-data "NOTICE.md${{ matrix.separator }}." \
+            --icon ${{ matrix.icon }} \
             --collect-data sentence_splitter \
             --collect-data pysbd \
-            --collect-all Pmw \
             --collect-all ctranslate2 \
-            translator.py
+            qt_app.py
 
       - name: Check the bundled data files
         run: |
-          for file in tr.txt lid.176.ftz nllb_languages.json m2m_languages.json fasttext_to_flores.json; do
+          for file in tr.txt lid.176.ftz nllb_languages.json m2m_languages.json fasttext_to_flores.json NOTICE.md icon.png; do
             test -n "$(find dist -name "$file" | head -1)" || { echo "Missing $file in the build"; exit 1; }
           done
 
@@ -79,6 +82,16 @@ jobs:
           "/c/Program Files (x86)/NSIS/makensis.exe" "//DVERSION=${VERSION}" installer.nsi
         env:
           INPUT_TAG: ${{ inputs.tag }}
+
+      - name: Install the Windows installer and start the installed app
+        if: matrix.name == 'Windows'
+        run: |
+          powershell -Command 'Start-Process -FilePath (Resolve-Path DesktopTranslator_Windows_*.exe) -ArgumentList "/S" -Wait'
+          APP="/c/Program Files/DesktopTranslator"
+          test -f "$APP/DesktopTranslator.exe" || { echo "The app was not installed"; exit 1; }
+          "$APP/DesktopTranslator.exe" &
+          sleep 20
+          tasklist | grep -i DesktopTranslator.exe || { echo "The installed app is not running"; exit 1; }
 
       - uses: actions/upload-artifact@v7
         with:

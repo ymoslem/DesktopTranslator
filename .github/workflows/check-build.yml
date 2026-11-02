@@ -1,15 +1,15 @@
-name: Build the Qt prototype
+name: Check the build
 
 on:
   push:
-    branches: [qt]
+    branches: [main, qt]
     paths:
       - qt_app.py
       - img/icon.png
       - img/icon-macos.png
       - installer.nsi
       - engine.py
-      - .github/workflows/build-qt.yml
+      - .github/workflows/check-build.yml
   workflow_dispatch:
 
 permissions:
@@ -25,12 +25,12 @@ jobs:
             name: macOS
             separator: ":"
             icon: img/icon-macos.png
-            program: dist/DesktopTranslatorQt.app/Contents/MacOS/DesktopTranslatorQt
+            program: dist/DesktopTranslator.app/Contents/MacOS/DesktopTranslator
           - os: windows-latest
             name: Windows
             separator: ";"
             icon: img/icon.png
-            program: dist/DesktopTranslatorQt/DesktopTranslatorQt.exe
+            program: dist/DesktopTranslator/DesktopTranslator.exe
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -43,11 +43,11 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install -r requirements.txt PySide6-Essentials==6.12.0 pyinstaller==6.22.3 Pillow==13.0.0
+        run: pip install -r requirements.txt pyinstaller==6.22.3 Pillow==13.0.0
 
       - name: Build the app
         run: |
-          pyinstaller -y --windowed --name DesktopTranslatorQt \
+          pyinstaller -y --windowed --name DesktopTranslator \
             --add-data "utils${{ matrix.separator }}utils" \
             --add-data "img/icon.png${{ matrix.separator }}img" \
             --add-data "NOTICE.md${{ matrix.separator }}." \
@@ -61,7 +61,7 @@ jobs:
         run: |
           python - <<'PY' | tee size-${{ matrix.name }}.txt
           import os, shutil, subprocess
-          name = "DesktopTranslatorQt"
+          name = "DesktopTranslator"
           app = "dist/" + name + ".app"
           if os.path.isdir(app):
               # macOS: the app has links that must not be counted twice, so measure it as macOS does
@@ -77,21 +77,21 @@ jobs:
       - name: Check the app icon
         run: |
           if [ "${{ matrix.name }}" = "macOS" ]; then
-            ls -la dist/DesktopTranslatorQt.app/Contents/Resources/*.icns
+            ls -la dist/DesktopTranslator.app/Contents/Resources/*.icns
           else
-            powershell -Command 'Add-Type -AssemblyName System.Drawing; $icon = [System.Drawing.Icon]::ExtractAssociatedIcon((Resolve-Path "dist/DesktopTranslatorQt/DesktopTranslatorQt.exe")); "icon of the exe: " + $icon.Width + " x " + $icon.Height'
+            powershell -Command 'Add-Type -AssemblyName System.Drawing; $icon = [System.Drawing.Icon]::ExtractAssociatedIcon((Resolve-Path "dist/DesktopTranslator/DesktopTranslator.exe")); "icon of the exe: " + $icon.Width + " x " + $icon.Height'
           fi
 
       - name: Package the app
         run: |
           VERSION="0.4.0-dev"
           if [ "${{ matrix.name }}" = "macOS" ]; then
-            ditto -c -k --keepParent dist/DesktopTranslatorQt.app "DesktopTranslatorQt_macOS_${VERSION}.zip"
+            ditto -c -k --keepParent dist/DesktopTranslator.app "DesktopTranslator_macOS_${VERSION}.zip"
           else
             choco install nsis -y --no-progress
-            "/c/Program Files (x86)/NSIS/makensis.exe" "//DVERSION=${VERSION}" "//DAPP_NAME=DesktopTranslatorQt" installer.nsi
+            "/c/Program Files (x86)/NSIS/makensis.exe" "//DVERSION=${VERSION}" "//DAPP_NAME=DesktopTranslator" installer.nsi
           fi
-          ls -la DesktopTranslatorQt_*
+          ls -la DesktopTranslator_*
 
       - name: List the biggest files
         run: |
@@ -121,13 +121,13 @@ jobs:
       - name: Install the Windows installer and run the installed app
         if: matrix.name == 'Windows'
         run: |
-          powershell -Command 'Start-Process -FilePath (Resolve-Path DesktopTranslatorQt_Windows_*.exe) -ArgumentList "/S" -Wait'
-          APP="/c/Program Files/DesktopTranslatorQt"
+          powershell -Command 'Start-Process -FilePath (Resolve-Path DesktopTranslator_Windows_*.exe) -ArgumentList "/S" -Wait'
+          APP="/c/Program Files/DesktopTranslator"
           for file in lid.176.ftz nllb_languages.json m2m_languages.json fasttext_to_flores.json NOTICE.md; do
             test -n "$(find "$APP" -name "$file" | head -1)" || { echo "Missing $file in the installed app"; exit 1; }
           done
           M=model/nllb-200-distilled-600M-int8
-          "$APP/DesktopTranslatorQt.exe" --demo $M $M/sentencepiece.model "Arabic (Modern Standard)" en.txt screenshot-installed-Windows.png
+          "$APP/DesktopTranslator.exe" --demo $M $M/sentencepiece.model "Arabic (Modern Standard)" en.txt screenshot-installed-Windows.png
           ls -la screenshot-installed-Windows.png
 
       - uses: actions/upload-artifact@v7
@@ -137,62 +137,5 @@ jobs:
           path: |
             size-${{ matrix.name }}.txt
             screenshot-*.png
-            DesktopTranslatorQt_*
+            DesktopTranslator_*
           if-no-files-found: ignore
-
-  tk-size:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-latest
-            name: macOS
-            separator: ":"
-          - os: windows-latest
-            name: Windows
-            separator: ";"
-    runs-on: ${{ matrix.os }}
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.11"
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt pyinstaller==6.22.3
-
-      - name: Build the Tk app like the releases
-        run: |
-          pyinstaller -y --windowed --name DesktopTranslator \
-            --add-data "utils${{ matrix.separator }}utils" \
-            --collect-data sentence_splitter \
-            --collect-data pysbd \
-            --collect-all Pmw \
-            --collect-all ctranslate2 \
-            translator.py
-
-      - name: Measure the size the same way
-        run: |
-          python - <<'PY' | tee size-Tk-${{ matrix.name }}.txt
-          import os, shutil, subprocess
-          name = "DesktopTranslator"
-          app = "dist/" + name + ".app"
-          if os.path.isdir(app):
-              # macOS: the app has links that must not be counted twice, so measure it as macOS does
-              unpacked = int(subprocess.check_output(["du", "-sk", app]).split()[0]) * 1024
-              subprocess.check_call(["ditto", "-c", "-k", "--keepParent", app, "measure.zip"])
-              archive = "measure.zip"
-          else:
-              unpacked = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk("dist/" + name) for f in fs)
-              archive = shutil.make_archive("measure", "zip", "dist", name)
-          print("${{ matrix.name }} Tk build: unpacked %.0f MB, zip %.0f MB" % (unpacked / 1e6, os.path.getsize(archive) / 1e6))
-          PY
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: tk-${{ matrix.name }}
-          path: size-Tk-${{ matrix.name }}.txt
