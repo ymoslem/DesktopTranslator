@@ -118,6 +118,18 @@ jobs:
           "${{ matrix.program }}" --demo $M $M/sentencepiece.model "English" ar.txt screenshot-ar-en-${{ matrix.name }}.png
           ls -la screenshot-*.png
 
+      - name: Install the Windows installer and run the installed app
+        if: matrix.name == 'Windows'
+        run: |
+          powershell -Command 'Start-Process -FilePath (Resolve-Path DesktopTranslatorQt_Windows_*.exe) -ArgumentList "/S" -Wait'
+          APP="/c/Program Files/DesktopTranslatorQt"
+          for file in lid.176.ftz nllb_languages.json m2m_languages.json fasttext_to_flores.json NOTICE.md; do
+            test -n "$(find "$APP" -name "$file" | head -1)" || { echo "Missing $file in the installed app"; exit 1; }
+          done
+          M=model/nllb-200-distilled-600M-int8
+          "$APP/DesktopTranslatorQt.exe" --demo $M $M/sentencepiece.model "Arabic (Modern Standard)" en.txt screenshot-installed-Windows.png
+          ls -la screenshot-installed-Windows.png
+
       - uses: actions/upload-artifact@v7
         if: always()
         with:
