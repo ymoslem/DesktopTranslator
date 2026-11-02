@@ -18,8 +18,8 @@ AUTO_DETECT = "Auto detect"
 LONG_LINE_CHARS = 100000  # a text area takes minutes to display a single line much longer than this
 REPETITION_PENALTY = 1.2  # the optional penalty for repeated words; a penalty of 1.0 is the default, as it scored better
 WORD_LIMIT = 20000  # a longer text is translated as a document, from a file to a file
-BATCH_SENTENCES = 8
-DOCUMENT_LINES = 200  # lines of a document that are split and translated together  # sentences translated in one call, so that progress and cancelling stay quick
+BATCH_SENTENCES = 8  # sentences translated in one call, so that progress and cancelling stay quick
+DOCUMENT_LINES = 200  # lines of a document that are split and translated together
 
 # The folder with the program files, also when the app is packaged
 DATA_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
