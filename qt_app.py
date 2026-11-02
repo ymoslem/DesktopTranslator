@@ -651,6 +651,9 @@ class Window(QMainWindow):
     def open_text_file(self, path, encoding=None):
         try:
             text, encoding = read_text_file(path, encoding)
+        except EngineError as error:
+            QMessageBox.critical(self, error.title, error.message)
+            return
         except (LookupError, UnicodeError, OSError) as error:
             QMessageBox.critical(self, "Cannot open the file", str(error))
             return

@@ -259,6 +259,20 @@ window.source_text.setPlainText("Short text.")
 long_file = os.path.join(FOLDER, "words.txt")
 with open(long_file, "w", encoding="utf-8") as file:
     file.write("word " * 30)
+# Files that are not plain text are explained, in the window and in document mode
+for name, start in (("a.pdf", b"%PDF-1.7\n"), ("b.docx", b"PK\x03\x04\x14\x00"), ("c.doc", b"\xd0\xcf\x11\xe0\xa1\xb1")):
+    not_text = os.path.join(FOLDER, name)
+    with open(not_text, "wb") as file:
+        file.write(start + b"\x00" * 40)
+    messages.clear()
+    window.open_text_file(not_text)
+    check(messages and messages[-1][0] == "Not a plain text file" and "plain text" in messages[-1][1] and window.source_text.toPlainText() == "Short text.",
+          "%s is explained, and not loaded" % name)
+try:
+    window.engine.translate_file(not_text, os.path.join(FOLDER, "never.txt"), "fra_Latn")
+    check(False, "a Word file is refused in document mode")
+except engine_module.EngineError as error:
+    check(error.title == "Not a plain text file", "a Word file is refused in document mode")
 offers.clear()
 window.open_text_file(long_file)
 check(offers and offers[0][1] == long_file and window.source_text.toPlainText() == "Short text.", "a file over the limit is offered as a document, and is not loaded")

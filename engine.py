@@ -47,6 +47,22 @@ def longest_line(text):
     return max((len(line) for line in text.splitlines()), default=0)
 
 
+# The start of files that are not plain text: PDF, Word and other Office or OpenDocument files, old Word files, RTF
+NOT_TEXT = (b"%PDF", b"PK\x03\x04", b"\xd0\xcf\x11\xe0", b"{\\rtf")
+
+
+def check_plain_text(file_name):
+    """Raise an EngineError for a file that is clearly not plain text, such as a PDF or a Word document"""
+    with open(file_name, "rb") as text_file:
+        start = text_file.read(8)
+    if start.startswith(NOT_TEXT):
+        raise EngineError(
+            "Not a plain text file",
+            os.path.basename(file_name) + " is not a plain text file. DesktopTranslator translates plain text (.txt) files, "
+            "so save the document as plain text first.",
+        )
+
+
 def read_text_file(file_name, encoding=None):
     """Read a text file; the encoding is tried as UTF-8 first, then guessed, unless it is given
 
@@ -55,8 +71,9 @@ def read_text_file(file_name, encoding=None):
         encoding (str): The encoding that was used
 
     Raises:
-        OSError, LookupError (unknown encoding), or UnicodeError (wrong encoding)
+        EngineError (a PDF or Word file), OSError, LookupError (unknown encoding), or UnicodeError (wrong encoding)
     """
+    check_plain_text(file_name)
     if encoding:
         codecs.lookup(encoding)
         with open(file_name, encoding=encoding) as text_file:
