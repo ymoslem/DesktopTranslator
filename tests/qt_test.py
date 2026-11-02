@@ -171,7 +171,7 @@ model_before = window.engine.model_dir
 original = qt_app.memory_warning
 qt_app.memory_warning = lambda model_dir: "This model needs about 6.1 GB of memory, and 2.0 GB is free now."
 messages.clear()
-check(window.load_model(FREN + "/ct2_model") is False and messages and "5.4 GB" in messages[-1] and window.engine.model_dir == model_before,
+check(window.load_model(FREN + "/ct2_model") is False and messages and "6.1 GB" in messages[-1] and window.engine.model_dir == model_before,
       "a model that may not fit in the memory is not opened without a yes")
 QMessageBox.question = staticmethod(lambda *a, **k: QMessageBox.StandardButton.Yes)
 check(window.load_model(FREN + "/ct2_model") is True and window.engine.model_dir == FREN + "/ct2_model", "it is opened after a yes")
