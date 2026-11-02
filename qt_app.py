@@ -1,4 +1,4 @@
-"""DesktopTranslator with a Qt interface, using the same engine as translator.py.
+"""DesktopTranslator, a translation app with a Qt interface; the translation itself is in engine.py.
 
 Usage: python qt_app.py
        python qt_app.py --demo MODEL_DIR SP_MODEL TARGET_LANGUAGE TEXT_FILE OUTPUT.png
