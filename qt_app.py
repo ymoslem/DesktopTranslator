@@ -366,11 +366,10 @@ class Window(QMainWindow):
         self.setCentralWidget(central)
 
         self.model_label = QLabel()
-        self.count_label = QLabel()
         self.count_timer = QTimer(self)  # counts a moment after the last change, so typing stays quick
         self.count_timer.setSingleShot(True)
         self.count_timer.setInterval(300)
-        self.count_timer.timeout.connect(self.update_word_count)
+        self.count_timer.timeout.connect(self.update_header)
         self.progress_bar = QProgressBar()
         self.progress_bar.setFixedWidth(160)
         self.progress_bar.hide()
@@ -378,10 +377,8 @@ class Window(QMainWindow):
         self.status_label = QLabel()
         self.status_label.setContentsMargins(12, 2, 12, 2)
         self.model_label.setContentsMargins(12, 2, 12, 2)
-        self.count_label.setContentsMargins(12, 2, 12, 2)
         self.statusBar().addWidget(self.status_label, 1)
         self.statusBar().addPermanentWidget(self.progress_bar)
-        self.statusBar().addPermanentWidget(self.count_label)
         self.statusBar().addPermanentWidget(self.model_label)
         self.say("Open a model to start, or choose Help > Get Models.")
 
@@ -393,10 +390,6 @@ class Window(QMainWindow):
         self.source_text.textChanged.connect(self.count_timer.start)
         self.source_combo.activated.connect(lambda _: self.update_header())
         self.target_combo.activated.connect(lambda _: self.remember_target())
-
-    def update_word_count(self):
-        words = len(self.source_text.toPlainText().split())
-        self.count_label.setText(format(words, ",") + (" word" if words == 1 else " words") if words else "")
 
     def say(self, message):
         self.status_label.setText(message)
@@ -515,7 +508,19 @@ class Window(QMainWindow):
         self.remember_target()
 
     def update_header(self):
-        self.source_header.setText("Source" if self.selected_source() != AUTO_DETECT else "Source (Auto detect)")
+        """Source header: the language, when it is detected, and the number of words"""
+        text = self.source_text.toPlainText()
+        words = len(text.split())
+        notes = []
+        if self.selected_source() == AUTO_DETECT and text.strip():
+            code, prefix = self.engine.source_language(text[:2000])
+            if code:
+                reverse = {v: k for k, v in self.engine.language_codes.items()}
+                self.detected_name = reverse.get(prefix, "")  # a name the language lists know, for swapping
+                notes.append("detected: " + (self.detected_name or code))
+        if words:
+            notes.append(format(words, ",") + (" word" if words == 1 else " words"))
+        self.source_header.setText("Source (" + ", ".join(notes) + ")" if notes else "Source")
 
     # Models
 
@@ -682,7 +687,7 @@ class Window(QMainWindow):
         self.source_text.clear()
         self.target_text.clear()
         self.translation = ""
-        self.source_header.setText("Source")
+        self.update_header()
 
     # Translation
 
@@ -716,7 +721,7 @@ class Window(QMainWindow):
             return
         reverse = {v: k for k, v in self.engine.language_codes.items()}
         self.detected_name = reverse.get(prefix, "")
-        self.source_header.setText("Source (detected: " + (self.detected_name or source_code) + ")" if source == AUTO_DETECT else "Source")
+        self.update_header()
         self.sentences, self.breaks, batches, self.total_words = self.engine.split(
             text, source_code, self.preferences.get("join_lines", False)
         )

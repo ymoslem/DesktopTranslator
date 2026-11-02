@@ -73,7 +73,7 @@ check(window.target_combo.currentText() == "Not needed" and not window.source_co
 output = translate(window, "Le comité a approuvé le nouveau budget après un long débat.\n\nMerci.")
 check(output.startswith("The Committee approved") and "\n\n" in output, "French is translated: " + repr(output))
 check(all(line == line.rstrip() for line in output.split("\n")), "no line ends with a space")
-check(window.source_header.text() == "Source (detected: fr)", "the detected language is shown")
+check(window.source_header.text().startswith("Source (detected: fr, "), "the detected language is shown")
 
 # A multilingual model with one SentencePiece file inside: no question
 asked.clear()
@@ -91,7 +91,7 @@ check(window.selected_source() == "French" and window.selected_target() == "Engl
 output = translate(window, "La commission a approuvé le nouveau budget après un long débat.")
 check("approved the new budget" in output.lower(), "French to English with the swapped languages: " + repr(output))
 output = translate(window, "Merhaba dünya.", target="English", source="Turkish")
-check("hello" in output.lower() and window.source_header.text() == "Source", "a selected source language is used: " + repr(output))
+check("hello" in output.lower() and window.source_header.text().startswith("Source (") and "detected" not in window.source_header.text(), "a selected source language is used: " + repr(output))
 window.source_combo.choose("Auto detect")
 check(window.source_combo.completer() is not None, "the language lists can be searched by typing")
 
@@ -182,14 +182,14 @@ QMessageBox.question = staticmethod(lambda *a, **k: (messages.append(a[2]), QMes
 
 # The detected language by name, the word count, the focus, and the layout
 translate(window, "The committee approved the new budget after a long debate.", target="French", source="Auto detect")
-check(window.source_header.text() == "Source (detected: English)", "the detected language is shown by name: " + window.source_header.text())
-for text, expected in (("one two three", "3 words"), ("one", "1 word"), ("", ""), ("a, b" + " c" * 1200, "1,202 words")):
+check(window.source_header.text().startswith("Source (detected: English, "), "the detected language is shown by name: " + window.source_header.text())
+for text, expected in (("one two three", "Source (detected: English, 3 words)"), ("one", "Source (detected: English, 1 word)"), ("", "Source"), ("a, b" + " c" * 1200, "Source (detected: English, 1,202 words)")):
     window.source_text.setPlainText(text)
     deadline = time.time() + 3
-    while window.count_label.text() != expected and time.time() < deadline:
+    while window.source_header.text() != expected and time.time() < deadline:
         app.processEvents()
         time.sleep(0.02)
-    check(window.count_label.text() == expected, "the word count shows %r: %r" % (expected, window.count_label.text()))
+    check(window.source_header.text() == expected, "the word count shows %r: %r" % (expected, window.source_header.text()))
 window.load_model(NLLB)
 check(window.focusWidget() is window.source_text, "the cursor is in the source pane after opening a model")
 top_row_bottom = window.target_combo.mapTo(window, window.target_combo.rect().bottomLeft()).y()
