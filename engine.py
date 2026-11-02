@@ -11,13 +11,15 @@ import sentencepiece as spm
 from charset_normalizer import from_path
 
 from utils.model_info import read_vocabulary, detect_model_type
-from utils.paragraph_splitter import paragraph_tokenizer, join_lines
+from utils.paragraph_splitter import paragraph_tokenizer, join_lines, TextBuilder
 from utils.settings import load_settings, save_settings
 
 AUTO_DETECT = "Auto detect"
 LONG_LINE_CHARS = 100000  # a text area takes minutes to display a single line much longer than this
 REPETITION_PENALTY = 1.2  # the optional penalty for repeated words; a penalty of 1.0 is the default, as it scored better
-BATCH_SENTENCES = 8  # sentences translated in one call, so that progress and cancelling stay quick
+WORD_LIMIT = 20000  # a longer text is translated as a document, from a file to a file
+BATCH_SENTENCES = 8
+DOCUMENT_LINES = 200  # lines of a document that are split and translated together  # sentences translated in one call, so that progress and cancelling stay quick
 
 # The folder with the program files, also when the app is packaged
 DATA_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -339,8 +341,10 @@ class Engine:
             translations.append("".join(tokens).replace("▁", " ").strip())
         return translations
 
-    def translate(self, batches, beam_size, target_lang_code, src_prefix, is_cancelled=lambda: False, on_progress=None, repetition_penalty=1.0):
-        """Translate the batches; returns the translated sentences, or None if cancelled"""
+    def translate(self, batches, beam_size, target_lang_code, src_prefix, is_cancelled=lambda: False, on_progress=None, repetition_penalty=1.0, on_batch=None):
+        """Translate the batches; returns the translated sentences, or None if cancelled
+
+        on_progress gets the number of words done, and on_batch gets the sentences translated so far."""
         translations = []
         words_done = 0
         for batch in batches:
@@ -348,6 +352,62 @@ class Engine:
                 return None
             translations.extend(self.translate_batch(batch, beam_size, target_lang_code, src_prefix, repetition_penalty))
             words_done += len(" ".join(batch).split())
+            if on_batch:
+                on_batch(translations)
             if on_progress:
                 on_progress(words_done)
         return translations
+
+    def translate_file(self, input_path, output_path, target_lang_code, source_name=AUTO_DETECT, beam_size=3,
+                       join=False, repetition_penalty=1.0, is_cancelled=lambda: False, on_progress=None, encoding=None):
+        """Translate a text file into another file, a part at a time, so that any length works
+
+        The translated part is in the output file also if the translation is cancelled.
+
+        Returns:
+            words_done (int), words_total (int): the words translated, and the words of the file
+        """
+        text, _ = read_text_file(input_path, encoding)
+        lines = text.splitlines(True)
+        words_total = max(len(text.split()), 1)
+        source_code, prefix = self.source_language(text[:2000], source_name)
+        if source_code is None:
+            raise EngineError("Source language", "The source language is not supported or not recognized. Select the source language.")
+
+        # Cut the lines into parts, at a blank line when there is one
+        parts, part = [], []
+        for line in lines:
+            part.append(line)
+            if len(part) >= DOCUMENT_LINES and (line.strip() == "" or len(part) >= 10 * DOCUMENT_LINES):
+                parts.append("".join(part))
+                part = []
+        if part:
+            parts.append("".join(part))
+
+        words_done = 0
+        with open(output_path, "w", encoding="utf-8") as output:
+            for part_text in parts:
+                if is_cancelled():
+                    break
+                before = len(part_text) - len(part_text.lstrip("\n"))
+                after = len(part_text) - len(part_text.rstrip("\n"))
+                if part_text.strip() == "":
+                    output.write("\n" * len(part_text))
+                    continue
+                sentences, breaks, batches, _ = self.split(part_text, source_code, join)
+                builder, translated = TextBuilder(breaks), []
+                output.write("\n" * before)
+                for batch in batches:
+                    if is_cancelled():
+                        break
+                    translated.extend(self.translate_batch(batch, beam_size, target_lang_code, prefix, repetition_penalty))
+                    output.write(builder.add(translated))
+                    output.flush()
+                    words_done += len(" ".join(batch).split())
+                    if on_progress:
+                        on_progress(words_done, words_total)
+                else:
+                    output.write("\n" * after)
+                    continue
+                break
+        return words_done, words_total

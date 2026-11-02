@@ -19,7 +19,9 @@ settings_module.settings_path = lambda: SETTINGS_FILE
 from PySide6.QtCore import QMimeData, QUrl, Qt
 from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QMessageBox
 
+import engine as engine_module
 import qt_app
+from utils.paragraph_splitter import TextBuilder, paragraph_detokenizer
 
 FREN, NLLB = sys.argv[1], sys.argv[2]
 FOLDER = tempfile.mkdtemp()
@@ -126,7 +128,7 @@ messages.clear()
 window.open_text_file(os.path.join(FOLDER, "long.txt")) if False else None
 long_path = os.path.join(FOLDER, "long.txt")
 with open(long_path, "w", encoding="utf-8") as file:
-    file.write("x " * 60000)
+    file.write("x" * 120000)  # one very long line, but only one word
 window.open_text_file(long_path)
 check(messages and "120,000 characters" in messages[-1], "a very long line asks first")
 
@@ -161,8 +163,8 @@ check(window.translate_button.text() == "Cancel" and window.progress_bar.isVisib
       "while translating, the button says Cancel, a progress bar shows, and the time left is shown")
 window.cancel_action.trigger()
 wait(window)
-check(window.status_label.text() == "Translation cancelled." and window.translate_button.text() == "Translate" and not window.target_text.toPlainText(),
-      "translation can be cancelled")
+check("cancelled" in window.status_label.text() and window.translate_button.text() == "Translate" and not window.target_text.isReadOnly(),
+      "translation can be cancelled, and the pane can be edited again")
 
 # A model that may not fit in the memory asks first
 model_before = window.engine.model_dir
@@ -208,6 +210,124 @@ translate(window, "The committee approved the new budget.")
 check(penalties and set(penalties) == {1.2}, "the preference turns on the penalty of 1.2: " + str(set(penalties)))
 window.preferences.set("repetition_penalty", 1.0)
 window.engine.translate_batch = real_translate_batch
+
+# The text builder gives the same text as the detokenizer, step by step
+for sentences, breaks in ((["A.", "B.", "C."], [0, 1, "\n", "\n", 2]), (["A.", "B."], [0, "\n", 1]), (["A."], [0])):
+    builder, built = TextBuilder(breaks), ""
+    for count in range(1, len(sentences) + 1):
+        built += builder.add(sentences[:count])
+    check(built.rstrip() == paragraph_detokenizer(sentences, breaks).rstrip(), "the text built step by step is the same: " + repr(built))
+
+# The translation is shown as it is produced, and a cancel keeps the translated part
+many = " ".join(["The committee approved the new budget after a long debate in the main hall."] * 30)
+window.source_text.setPlainText(many)
+window.target_combo.choose("French")
+window.translate_or_cancel()
+lengths, read_only = [], []
+started = time.time()
+while window.worker is not None and time.time() - started < 120:
+    app.processEvents()
+    if window.worker is not None:
+        lengths.append(len(window.target_text.toPlainText()))
+        read_only.append(window.target_text.isReadOnly())
+    time.sleep(0.02)
+check(any(0 < n < max(lengths) for n in lengths) and all(read_only), "the translation grows while it is made, and the pane is read-only meanwhile")
+check(not window.target_text.isReadOnly() and window.target_text.toPlainText().rstrip() == window.translation, "the final text is the translation, and the pane can be edited")
+window.source_text.setPlainText(many + " " + many)
+window.translate_or_cancel()
+started = time.time()
+while not window.target_text.toPlainText() and time.time() - started < 60:
+    app.processEvents()
+    time.sleep(0.02)
+window.cancel_action.trigger()
+wait(window)
+partial = window.target_text.toPlainText()
+check(partial and partial.rstrip() == window.translation and len(partial) < 2 * len(window.translation) + 10 and "kept" in window.status_label.text(),
+      "a cancel keeps the translated part: %d characters" % len(partial))
+
+# A text over the word limit is offered as a document
+offers = []
+window.offer_document = lambda words, path=None: offers.append((words, path)) or False
+qt_app.WORD_LIMIT = 20
+messages.clear()
+window.source_text.setPlainText("one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty twenty-one")
+window.translate_or_cancel()
+check(offers and offers[0][0] == 21 and window.worker is None, "a text over the limit is not translated in the window: " + str(offers))
+window.source_text.setPlainText("Short text.")
+long_file = os.path.join(FOLDER, "words.txt")
+with open(long_file, "w", encoding="utf-8") as file:
+    file.write("word " * 30)
+offers.clear()
+window.open_text_file(long_file)
+check(offers and offers[0][1] == long_file and window.source_text.toPlainText() == "Short text.", "a file over the limit is offered as a document, and is not loaded")
+qt_app.WORD_LIMIT = engine_module.WORD_LIMIT
+del window.offer_document
+
+# Document mode
+paragraphs = ["The committee approved the new budget after a long debate. It will meet again next month. The members were pleased.",
+              "Thank you very much for your help. Does this work for you? We hope so.", "Good morning. See you tomorrow.",
+              "The weather is nice today. We went for a walk. The park was full of people."]
+document = os.path.join(FOLDER, "document.txt")
+with open(document, "w", encoding="utf-8") as file:
+    file.write("\n\n".join(paragraphs) + "\n")
+window.target_combo.choose("French")
+window.source_combo.choose("Auto detect")
+sentences, breaks, batches, _ = window.engine.split("\n\n".join(paragraphs), "en")
+expected = paragraph_detokenizer(window.engine.translate(batches, 3, "fra_Latn", "eng_Latn"), breaks) + "\n"
+saved_documents = []
+
+
+def run_document(path, output, cancel_after_first=False):
+    QFileDialog.getSaveFileName = staticmethod(lambda *a, **k: (output, ""))
+
+    def run_dialog(self):
+        if cancel_after_first:
+            real = window.engine.translate_batch
+            calls = []
+
+            def cancel_after_one_batch(*args, **kw):
+                result = real(*args, **kw)
+                calls.append(1)
+                self.worker.cancel = True  # the first batch is translated, so stop
+                return result
+
+            window.engine.translate_batch = cancel_after_one_batch
+        self.start()
+        while self.worker.isRunning() or self.outcome == "":
+            app.processEvents()
+            time.sleep(0.01)
+        if cancel_after_first:
+            window.engine.translate_batch = real
+        return 0
+
+    qt_app.DocumentDialog.exec = run_dialog
+    window.translate_document(path)
+
+
+output_file = os.path.join(FOLDER, "document.French.txt")
+run_document(document, output_file)
+with open(output_file, encoding="utf-8") as file:
+    produced = file.read()
+check(produced == expected and "done" in window.status_label.text().lower() or "translated" in window.status_label.text().lower(), "a document is translated to a file with the same paragraphs: " + repr(produced[:60]))
+check(produced == expected, "the file has the translation, with the blank lines kept, and no trailing spaces")
+engine_module.DOCUMENT_LINES = 2
+run_document(document, output_file)
+with open(output_file, encoding="utf-8") as file:
+    produced_in_parts = file.read()
+check(produced_in_parts == expected, "translating in small parts gives the same file")
+engine_module.DOCUMENT_LINES = 3
+cancelled_file = os.path.join(FOLDER, "cancelled.txt")
+run_document(document, cancelled_file, cancel_after_first=True)
+with open(cancelled_file, encoding="utf-8") as file:
+    partial_document = file.read()
+check(0 < len(partial_document) < len(expected) and expected.startswith(partial_document.rstrip()) and "Cancelled" in window.status_label.text(),
+      "a cancelled document keeps the translated part: %d of %d characters" % (len(partial_document), len(expected)))
+engine_module.DOCUMENT_LINES = 200
+messages.clear()
+QFileDialog.getSaveFileName = staticmethod(lambda *a, **k: (document, ""))
+window.translate_document(document)
+check(messages and "different file" in messages[-1][1], "the output file must differ from the input file")
+QFileDialog.getSaveFileName = staticmethod(lambda *a, **k: ("", ""))
 
 # Text size and the menus
 sizes = [window.source_text.font().pointSize()]

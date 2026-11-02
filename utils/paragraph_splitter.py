@@ -87,3 +87,34 @@ def paragraph_detokenizer(sentences, breaks):
     text = "".join(output)
     # Sentences are joined with a space, so lines would end with one
     return "\n".join(line.rstrip() for line in text.split("\n"))
+
+
+class TextBuilder:
+    """Build the translated text step by step, as the sentences are translated
+
+    The text after all the steps is the one that paragraph_detokenizer gives.
+    """
+
+    def __init__(self, breaks):
+        self.breaks = breaks
+        self.position = 0
+
+    def add(self, sentences):
+        """Return the text that the translated sentences so far add to the text
+
+        Args:
+            sentences (list): All the sentences translated so far, from the first one
+        """
+        output = []
+        while self.position < len(self.breaks):
+            current = self.breaks[self.position]
+            if current == "\n":
+                output.append("\n")
+            elif current < len(sentences):
+                following = self.breaks[self.position + 1] if self.position + 1 < len(self.breaks) else None
+                # A space only separates sentences of one paragraph
+                output.append(sentences[current] + (" " if isinstance(following, int) else ""))
+            else:
+                break
+            self.position += 1
+        return "".join(output)

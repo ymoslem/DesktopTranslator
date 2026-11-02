@@ -9,7 +9,7 @@ import sys
 import time
 
 from PySide6.QtCore import QByteArray, Qt, QThread, QTimer, QUrl, Signal
-from PySide6.QtGui import QAction, QDesktopServices, QIcon, QKeySequence
+from PySide6.QtGui import QAction, QDesktopServices, QIcon, QKeySequence, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -37,6 +37,7 @@ from engine import (
     DATA_DIR,
     LONG_LINE_CHARS,
     REPETITION_PENALTY,
+    WORD_LIMIT,
     Engine,
     EngineError,
     Preferences,
@@ -47,7 +48,7 @@ from engine import (
     read_text_file,
     write_text_file,
 )
-from utils.paragraph_splitter import paragraph_detokenizer
+from utils.paragraph_splitter import TextBuilder, paragraph_detokenizer
 
 APP_NAME = "DesktopTranslator"
 VERSION = "0.4.0 (development)"
@@ -83,6 +84,7 @@ class Worker(QThread):
     """Translates in the background, and reports with signals"""
 
     progress = Signal(int)
+    batch_done = Signal(list)
     done = Signal(list)
     cancelled = Signal()
     failed = Signal(str)
@@ -99,11 +101,97 @@ class Worker(QThread):
             translations = self.engine.translate(
                 self.batches, self.beam_size, self.target_lang_code, self.src_prefix,
                 is_cancelled=lambda: self.cancel, on_progress=self.progress.emit,
-                repetition_penalty=self.repetition_penalty,
+                repetition_penalty=self.repetition_penalty, on_batch=lambda sentences: self.batch_done.emit(list(sentences)),
             )
             self.cancelled.emit() if translations is None else self.done.emit(translations)
         except Exception as error:
             self.failed.emit(str(error))
+
+
+class DocumentWorker(QThread):
+    """Translates a file into another file in the background"""
+
+    progress = Signal(int, int)
+    finished_ok = Signal(int, int)
+    failed = Signal(str)
+
+    def __init__(self, engine, input_path, output_path, target, source_name, beam_size, join, penalty):
+        super().__init__()
+        self.engine, self.input_path, self.output_path = engine, input_path, output_path
+        self.options = (target, source_name, beam_size, join, penalty)
+        self.cancel = False
+
+    def run(self):
+        target, source_name, beam_size, join, penalty = self.options
+        try:
+            done, total = self.engine.translate_file(
+                self.input_path, self.output_path, target, source_name, beam_size, join, penalty,
+                is_cancelled=lambda: self.cancel, on_progress=self.progress.emit,
+            )
+            self.finished_ok.emit(done, total)
+        except Exception as error:
+            self.failed.emit(str(error))
+
+
+class DocumentDialog(QDialog):
+    """Shows the progress of the translation of a file, which can be cancelled"""
+
+    def __init__(self, parent, worker, input_path):
+        super().__init__(parent)
+        self.setWindowTitle("Translate Document")
+        self.worker = worker
+        self.outcome = ""  # done, cancelled, or the error
+        self.label = QLabel("Translating " + os.path.basename(input_path) + "...")
+        self.bar = QProgressBar()
+        self.bar.setRange(0, 0)  # until the first part is translated
+        self.detail = QLabel("")
+        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.clicked.connect(self.cancel)
+        layout = QVBoxLayout(self)
+        for widget in (self.label, self.bar, self.detail, self.cancel_button):
+            layout.addWidget(widget)
+        self.setMinimumWidth(420)
+        worker.progress.connect(self.on_progress)
+        worker.finished_ok.connect(self.on_finished)
+        worker.failed.connect(self.on_failed)
+
+    def start(self):
+        self.start_time = time.time()
+        self.worker.start()
+
+    def exec(self):
+        self.start()
+        return super().exec()
+
+    def cancel(self):
+        self.worker.cancel = True
+        self.cancel_button.setEnabled(False)
+        self.detail.setText("Cancelling...")
+
+    def on_progress(self, done, total):
+        self.bar.setRange(0, total)
+        self.bar.setValue(min(done, total))
+        detail = str(int(100 * done / total)) + "%"
+        elapsed = time.time() - self.start_time
+        if elapsed > 3 and done:
+            detail += " (about " + format_duration(elapsed * (total - done) / done) + " left)"
+        self.detail.setText(detail)
+
+    def on_finished(self, done, total):
+        self.outcome = "done" if done >= total or not self.worker.cancel else "cancelled"
+        self.worker.wait()
+        self.accept()
+
+    def on_failed(self, message):
+        self.outcome = message
+        self.worker.wait()
+        self.accept()
+
+    def reject(self):  # closing the window cancels, and the translated part is kept
+        if self.worker.isRunning():
+            self.cancel()
+        else:
+            super().reject()
 
 
 class SourceEdit(QTextEdit):
@@ -327,6 +415,7 @@ class Window(QMainWindow):
         file_menu = bar.addMenu("&File")
         self.action(file_menu, "Open Text...", self.open_text, QKeySequence.StandardKey.Open)
         self.action(file_menu, "Reopen Text with Encoding...", self.reopen_with_encoding)
+        self.action(file_menu, "Translate Document...", lambda: self.translate_document(), "Ctrl+Shift+O")
         self.action(file_menu, "Save Translation...", self.save_translation, QKeySequence.StandardKey.Save)
         file_menu.addSeparator()
         self.action(file_menu, "Quit", self.close, QKeySequence.StandardKey.Quit)
@@ -555,6 +644,10 @@ class Window(QMainWindow):
         except (LookupError, UnicodeError, OSError) as error:
             QMessageBox.critical(self, "Cannot open the file", str(error))
             return
+        words = len(text.split())
+        if words > WORD_LIMIT:
+            self.offer_document(words, path)
+            return
         if not self.confirm_long_lines(text):
             return
         self.file_name = path
@@ -601,6 +694,10 @@ class Window(QMainWindow):
         if not text.strip():
             self.say("Enter some text to translate.")
             return
+        words = len(text.split())
+        if words > WORD_LIMIT:
+            self.offer_document(words)
+            return
         if not self.ensure_loaded():
             QMessageBox.critical(self, "No model", "Please open a model first (Translate > Open Model).")
             return
@@ -624,11 +721,15 @@ class Window(QMainWindow):
             text, source_code, self.preferences.get("join_lines", False)
         )
         self.start = time.time()
+        self.builder, self.partial_text = TextBuilder(self.breaks), ""
+        self.target_text.clear()
+        self.target_text.setReadOnly(True)  # while the translation is added to it
         penalty = REPETITION_PENALTY if self.preferences.get("repetition_penalty", 1.0) > 1.0 else 1.0
         self.worker = Worker(self.engine, batches, self.preferences.get("beam_size", 3), target, prefix, penalty)
         self.worker.progress.connect(self.on_progress)
+        self.worker.batch_done.connect(self.on_batch)
         self.worker.done.connect(self.on_done)
-        self.worker.cancelled.connect(lambda: self.finish("Translation cancelled."))
+        self.worker.cancelled.connect(lambda: self.finish("Translation cancelled. The translated part is kept."))
         self.worker.failed.connect(lambda message: self.finish("Translation failed: " + message))
         self.progress_bar.setRange(0, self.total_words)
         self.progress_bar.setValue(0)
@@ -650,18 +751,93 @@ class Window(QMainWindow):
             status += " (about " + format_duration(elapsed * (self.total_words - words_done) / words_done) + " left)"
         self.say(status)
 
+    def on_batch(self, translations):
+        """Add the sentences that were just translated to the translation"""
+        added = self.builder.add(translations)
+        if not added:
+            return
+        bar = self.target_text.verticalScrollBar()
+        at_end = bar.value() >= bar.maximum() - 4  # follow the text, unless the user scrolled up
+        cursor = self.target_text.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        cursor.insertText(added)
+        self.partial_text += added
+        if at_end:
+            bar.setValue(bar.maximum())
+
     def on_done(self, translations):
         self.translation = paragraph_detokenizer(translations, self.breaks)
-        self.target_text.setPlainText(self.translation)
+        if self.partial_text.rstrip() != self.translation:
+            self.target_text.setPlainText(self.translation)
         self.finish("Translation completed in %.1f s." % (time.time() - self.start))
 
     def finish(self, message):
         self.worker.wait()
+        if self.worker.cancel or message.startswith("Translation failed"):
+            self.translation = self.partial_text.rstrip()  # what was translated is kept
+        self.target_text.setReadOnly(False)
         self.worker = None
         self.progress_bar.hide()
         self.translate_button.setText("Translate")
         self.cancel_action.setEnabled(False)
         self.say(message)
+
+    # Documents
+
+    def offer_document(self, words, path=None):
+        """The text is too long for the window, so offer to translate it as a document"""
+        box = QMessageBox(self)
+        box.setWindowTitle("Long text")
+        box.setText(
+            "The text has " + format(words, ",") + " words, and the window translates up to " + format(WORD_LIMIT, ",")
+            + " words at a time.\n\nDocument mode translates a text file into another file, of any length, "
+            "and shows the progress."
+        )
+        translate = box.addButton("Translate Document...", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton(QMessageBox.StandardButton.Cancel)
+        box.exec()
+        if box.clickedButton() is translate:
+            self.translate_document(path)
+            return True
+        return False
+
+    def translate_document(self, path=None):
+        """Translate a text file into another file, with the languages and models of the window"""
+        if self.worker is not None:
+            return
+        if not self.ensure_loaded():
+            QMessageBox.critical(self, "No model", "Please open a model first (Translate > Open Model).")
+            return
+        try:
+            target = self.engine.target_language(self.selected_target())
+        except EngineError as error:
+            QMessageBox.critical(self, error.title, error.message)
+            return
+        if not path:
+            path, _ = QFileDialog.getOpenFileName(self, "Open the text file to translate", os.path.dirname(self.file_name), "Text files (*.txt);;All files (*)")
+            if not path:
+                return
+        language = "".join(c for c in self.selected_target() if c.isalnum()) or "translated"
+        output, _ = QFileDialog.getSaveFileName(self, "Save the translated document", os.path.splitext(path)[0] + "." + language + ".txt", "Text files (*.txt)")
+        if not output:
+            return
+        if os.path.abspath(output) == os.path.abspath(path):
+            QMessageBox.critical(self, "Translate Document", "Please choose a different file for the translation.")
+            return
+        penalty = REPETITION_PENALTY if self.preferences.get("repetition_penalty", 1.0) > 1.0 else 1.0
+        worker = DocumentWorker(
+            self.engine, path, output, target, self.selected_source(), self.preferences.get("beam_size", 3),
+            self.preferences.get("join_lines", False), penalty,
+        )
+        dialog = DocumentDialog(self, worker, path)
+        dialog.exec()
+        if dialog.outcome == "done":
+            self.say("Document translated: " + output)
+        elif dialog.outcome == "cancelled":
+            self.say("Cancelled. The translated part is saved in " + output)
+        else:
+            QMessageBox.critical(self, "Translate Document", dialog.outcome)
+            self.say("Translating the document failed.")
 
     # Windows
 
