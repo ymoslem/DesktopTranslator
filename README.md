@@ -54,7 +54,7 @@ Right-to-left languages such as Arabic, Persian, Urdu, and Hebrew are displayed 
 
 Each sentence is translated on its own, and a sentence that repeats is translated once and reused, so it is translated the same way everywhere.
 
-**Memory.** A model needs about 1.3 times the size of its `model.bin` file, plus 1 GB, and the app warns you if the computer has less memory free. Measured peaks are about 1.7 GB for NLLB-200 600M, 2.6 GB for 1.3B, and 5.4 GB for 3.3B.
+**Memory.** Larger models need more memory. The app warns you if the computer may not have enough free memory for the model you open.
 
 
 ## Run from Source
