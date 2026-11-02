@@ -1,6 +1,17 @@
 # Changelog
 
 
+## v0.3.2
+
+### Added
+
+- Translate > Avoid Repeated Words, which turns on a repetition penalty of 1.2
+
+### Changed
+
+- The repetition penalty is off by default, because the translations scored higher without it in tests with NLLB-200, M2M-100, and the French-to-English model (`tests/repetition_penalty_eval.py`)
+
+
 ## v0.3.1
 
 ### Changed
