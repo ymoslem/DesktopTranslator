@@ -60,12 +60,10 @@ def main(output, letter="ع", font_name="Geeza Pro", style=""):
     painter.setBrush(gradient)
     painter.drawRoundedRect(QRectF(40, 40, SIZE - 80, SIZE - 80), 220, 220)
 
-    # The bubbles
+    # The white bubble with its A first, so the yellow bubble can cover a little of the foot of the A
     bubble(painter, QRectF(150, 190, 470, 380), True, QColor("#ffffff"))
+    draw_letter(painter, QFont("Arial", 1), True, "A", QRectF(150, 190, 400, 370), QColor("#1d4ed8"), 280)
     bubble(painter, QRectF(400, 400, 470, 380), False, QColor("#fbbf24"))
-
-    # The letters, centred by their outline, and at most 60% of the height of the bubble
-    draw_letter(painter, QFont("Arial", 1), True, "A", QRectF(150, 190, 270, 290), QColor("#1d4ed8"), 280)  # left of the yellow bubble
     draw_letter(painter, QFont(font_name, 1), BOLD, letter, QRectF(400, 400, 470, 380), QColor("#7c2d12"), 300)
     painter.end()
     image.save(output)
