@@ -51,7 +51,7 @@ from engine import (
 from utils.paragraph_splitter import TextBuilder, paragraph_detokenizer
 
 APP_NAME = "DesktopTranslator"
-VERSION = "0.4.0 (development)"
+VERSION = "0.4.0"
 TARGET_PLACEHOLDER = "Select a language..."
 DEFAULT_TEXT_SIZE = 14
 QUALITY = {"Fast": 2, "Balanced": 3, "Accurate": 5}  # beam sizes
