@@ -1,14 +1,21 @@
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.3.2-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.2/DesktopTranslator_Windows_0.3.2.exe)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.3.2-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.2/DesktopTranslator_macOS_0.3.2.zip)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.0-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.0/DesktopTranslator_Windows_0.4.0.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.0-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.0/DesktopTranslator_macOS_0.4.0.zip)
 
 # DesktopTranslator
-Local cross-platform machine translation GUI, based on [CTranslate2](https://github.com/OpenNMT/CTranslate2)
+DesktopTranslator translates text and documents on your own computer. Nothing is sent to a server, and no internet connection is needed once you have a model. It runs [CTranslate2](https://github.com/OpenNMT/CTranslate2) models with SentencePiece, including the multilingual [NLLB-200](https://arxiv.org/abs/2207.04672) (200 languages) and [M2M-100](https://arxiv.org/abs/2010.11125) (100 languages) and bilingual models such as OPUS-MT.
+
+* The source language is detected, and each sentence is translated on its own, keeping your paragraphs
+* The translation appears as it is made, and you can cancel and keep what is done
+* Long files are translated in the background with <kbd>File</kbd> menu \> <kbd>Translate Document...</kbd>
+* Right-to-left languages such as Arabic are edited right to left, and the app follows the dark mode of your system
+* Installers for Windows and macOS, or run it from source
 
 ![DesktopTranslator](img/DesktopTranslator.png)
 
 **Table of contents**
 
 1. [Download DesktopTranslator](#download-desktoptranslator)
+1. [Using DesktopTranslator](#using-desktoptranslator)
 1. [Run from Source](#run-from-source)
 1. [Translation Models](#translation-models)
     * [French-to-English Generic Model](#french-to-english-generic-model)
@@ -23,41 +30,65 @@ Local cross-platform machine translation GUI, based on [CTranslate2](https://git
     
 ## Download DesktopTranslator
    
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.3.2-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.2/DesktopTranslator_Windows_0.3.2.exe)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.3.2-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.2/DesktopTranslator_macOS_0.3.2.zip)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.0-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.0/DesktopTranslator_Windows_0.4.0.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.0-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.0/DesktopTranslator_macOS_0.4.0.zip)
 
 <img src="img/installer.png" width="60%">
 
 The installers are not signed. On macOS (Apple Silicon), open **System Settings** > **Privacy & Security** and click **Open Anyway** the first time you launch the app. On Windows, SmartScreen may show a warning; click **More info** > **Run anyway**.
 
 
+## Using DesktopTranslator
+
+1. Choose <kbd>Translate</kbd> menu \> <kbd>Open Model...</kbd> (<kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>M</kbd>) and select the folder of a [translation model](#translation-models). The SentencePiece model is found in the same folder; if there are several, you are asked which one to use.
+2. For a multilingual model, select the target language. The source language is detected, and the Source header shows it with the number of words. To choose the source language yourself, use the <kbd>From</kbd> list. The <kbd>⇄</kbd> button swaps the two languages.
+3. Type or paste text on the left, or open a file with <kbd>File</kbd> menu \> <kbd>Open Text...</kbd> (plain text files only; use <kbd>Reopen Text with Encoding...</kbd> if the characters look wrong). You can also drop a text file on the source pane.
+4. Click <kbd>Translate</kbd>. The translation appears as it is made, with the time left, and you can click <kbd>Cancel</kbd> to stop; the part that is done is kept. Use <kbd>Copy</kbd> or <kbd>File</kbd> menu \> <kbd>Save Translation...</kbd> when it is finished.
+
+Right-to-left languages such as Arabic, Persian, Urdu, and Hebrew are displayed and edited right to left, and the app follows the dark mode of your system. Use the <kbd>View</kbd> menu to change the text size.
+
+**Preferences** (<kbd>Edit</kbd> menu \> <kbd>Preferences...</kbd>)
+
+| Option | Effect |
+|---|---|
+| Translation quality | Fast (beam size 2), Balanced (3, the default), or Accurate (5, slower and sometimes better) |
+| Avoid repeated words | A repetition penalty of 1.2, off by default because translations scored higher without it in tests (`tests/repetition_penalty_eval.py`) |
+| Join lines inside a paragraph | For text from PDF files or OCR, where lines break in the middle of a sentence |
+| Remember the last model and target language | Opens the same model the next time |
+
+**Long texts.** The text area accepts up to 20,000 words. For a longer text, use <kbd>File</kbd> menu \> <kbd>Translate Document...</kbd> (<kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>O</kbd>), which translates a plain text file into another file in the background, with progress and the time left. If you cancel, the translated part is saved. PDF and Word files are not supported; save them as plain text first.
+
+Each sentence is translated on its own, and a sentence that repeats is translated once and reused, so it is translated the same way everywhere.
+
+**Memory.** Larger models need more memory. The app warns you if the computer may not have enough free memory for the model you open.
+
+
 ## Run from Source
 
-You need Python 3.11 or later, with Tkinter. The installers from [python.org](https://www.python.org/downloads/) include Tkinter. On Linux, you can install it with your package manager, e.g. `sudo apt install python3-tk`.
+You need Python 3.11 or later.
 ```
 git clone https://github.com/ymoslem/DesktopTranslator.git
 cd DesktopTranslator
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-python translator.py
+python qt_app.py
 ```
 On Windows, activate the virtual environment with `.venv\Scripts\activate`.
 
 
 ## Translation Models
 
-Currently, DesktopTranslator supports CTranslate2 models, and SentencePiece subwording models (you need both). If you have a model for OpenNMT-py, OpenNMT-tf, or FairSeq, you can [convert it to the CTranslate2 format](https://github.com/OpenNMT/CTranslate2#quickstart).
+DesktopTranslator supports CTranslate2 models with their SentencePiece subwording models (you need both). If you have a model for OpenNMT-py, OpenNMT-tf, or FairSeq, you can [convert it to the CTranslate2 format](https://github.com/OpenNMT/CTranslate2#quickstart).
 
 ### French-to-English Generic Model
 
 If you would like to try out the app and you do not have a model, you can download my [French-to-English generic model here](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.3/fren.zip). 
 1. Unzip the `fren.zip` archive of the French-to-English generic model you just downloaded. It has two folders, `ct2_model` for the CTranslate2 model and `sp_model` for the SentencePiece subwording models of French (source) and English (target).
-2. In DesktopTranslator, click the <kbd>CTranslate2 Model</kbd> button, and select the `ct2_model` folder.
-3. Click the <kbd>SentencePiece Model</kbd> button, navigate to the `sp_model` folder, and select `fr.model`.
-4. The default <kbd>Beam Size</kbd> is 3. You can increase it to 5, which can be slower, but sometimes results in better translation quality.
-5. In the left input text-area, type some text in French or use the <kbd>File</kbd> menu \> <kbd>Open...</kbd> to open a *.txt file.
-6. Click the <kbd>Translate</kbd> button.
+2. In DesktopTranslator, click the <kbd>Open Model...</kbd> button, and select the `ct2_model` folder.
+3. When you are asked for the SentencePiece model, navigate to the `sp_model` folder, and select `fr.model`.
+4. In the left text area, type some text in French or use the <kbd>File</kbd> menu \> <kbd>Open Text...</kbd> to open a *.txt file.
+5. Click the <kbd>Translate</kbd> button. The default translation quality is "Balanced"; you can change it in the Preferences.
 
 ### M2M-100 Multilingual Model
 
@@ -68,26 +99,22 @@ To use M2M-100 models in DesktopTranslator, please follow these steps:
     a. [M2M-100 418M-parameter model](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.1/M2M-100_418m_parameter_model_ct2.zip); smaller and faster, but sometimes less accurate; or  
     b. [M2M-100 1.2B-parameter model](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.1/M2M-100_12b_parameter_model_ct2.zip); bigger and somehow slower, but sometimes more accurate.
 2. Extract the *.zip arhieve of the model you downloaded.
-3. In DesktopTranslator, click the <kbd>CTranslate2 Model</kbd> button, and select the `m2m100_418m` or `m2m100_12b` folder.
-4. Click the <kbd>SentencePiece Model</kbd> button, and from the same model folder, select `sentencepiece.model`.
-5. **Important:** From the <kbd>Target language</kbd> dropdown list, select the target language to which you want to translate. This step is different between M2M-100 and some other models. M2M-100 models require a language code prefix. For other models that do not require this, keep the "None" option.
-6. The default <kbd>Beam Size</kbd> is 3. You can increase it to 5, which can be slower, but sometimes results in better translation quality.
-7. In the left input text-area, type some text in any language or your choice of use the <kbd>File</kbd> menu \> <kbd>Open...</kbd> to open a *.txt file.
-8. Click the <kbd>Translate</kbd> button.
+3. In DesktopTranslator, click the <kbd>Open Model...</kbd> button, and select the `m2m100_418m` or `m2m100_12b` folder. Its `sentencepiece.model` is used automatically.
+4. From the <kbd>To</kbd> list, select the language to which you want to translate. The source language is detected, or you can select it in the <kbd>From</kbd> list.
+5. In the left text area, type some text in any language or use the <kbd>File</kbd> menu \> <kbd>Open Text...</kbd> to open a *.txt file.
+6. Click the <kbd>Translate</kbd> button.
    
 ### NLLB-200 Multilingual Model
 
 DesktopTranslator also supports [**NLLB-200**](https://arxiv.org/abs/2207.04672) ([NLLB Team et al., 2022](https://arxiv.org/abs/2207.04672)), a multilingual model that can translate between 200 languages. Note that Meta released the NLLB-200 models under the [CC-BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) license, which does not allow commercial use. To use them, please follow these steps:
 1. Download one of the NLLB-200 models, converted to the CTranslate2 format with int8 quantization:  
-    a. [NLLB-200 distilled 600M-parameter model](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_distilled_600M_int8_ct2.zip); the smallest and fastest, and good for most uses. You can also use the <kbd>Help</kbd> menu \> <kbd>Download NLLB-200 600M Model</kbd>; or  
+    a. [NLLB-200 distilled 600M-parameter model](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_distilled_600M_int8_ct2.zip); the smallest and fastest, and good for most uses. You can also use the <kbd>Help</kbd> menu \> <kbd>Get Models...</kbd>; or  
     b. [NLLB-200 distilled 1.3B-parameter model](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_distilled_1.3B_int8_ct2.zip); slower and needs more memory, but sometimes more accurate; or  
     c. [NLLB-200 3.3B-parameter model](https://pretrained-nmt-models.s3.us-west-004.backblazeb2.com/CTranslate2/nllb/nllb-200_3.3B_int8_ct2.zip) (3.1 GB); the largest, slowest, and needs the most memory. This archive does not include a SentencePiece model, so also download [NLLB-200_sentencepiece.model](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_sentencepiece.model).
 2. Extract the *.zip archive.
-3. In DesktopTranslator, click the <kbd>CTranslate2 Model</kbd> button, and select the model folder, for example `nllb-200-distilled-600M-int8`.
-4. Click the <kbd>SentencePiece Model</kbd> button, and from the same folder, select `sentencepiece.model`. For the 3.3B model, select the `NLLB-200_sentencepiece.model` file you downloaded.
-5. From the <kbd>Target language</kbd> dropdown list, select the language to which you want to translate. Language varieties are grouped, for example "Arabic (Modern Standard)" and "Arabic (Egyptian)". The source language is detected automatically; to choose it yourself, use the dropdown list above the source text.
-6. For right-to-left target languages such as Arabic, Persian, Urdu, and Hebrew, the translation is displayed right to left in a read-only pane, because the text widget cannot edit or select right-to-left lines correctly. Use the <kbd>Copy</kbd> button above the pane to copy the translation. To edit it, clear <kbd>Translate</kbd> menu \> <kbd>Right-to-Left View</kbd>.
-7. Click the <kbd>Translate</kbd> button. You can click <kbd>Cancel</kbd> to stop a long translation.
+3. In DesktopTranslator, click the <kbd>Open Model...</kbd> button, and select the model folder, for example `nllb-200-distilled-600M-int8`. Its `sentencepiece.model` is used automatically. For the 3.3B model, when you are asked, select the `NLLB-200_sentencepiece.model` file you downloaded.
+4. From the <kbd>To</kbd> list, select the language to which you want to translate. You can type to search the list. Language varieties are grouped, for example "Arabic (Modern Standard)" and "Arabic (Egyptian)". The source language is detected automatically; to choose it yourself, use the <kbd>From</kbd> list.
+5. Click the <kbd>Translate</kbd> button. You can click <kbd>Cancel</kbd> to stop a long translation.
 
 ### OPUS Models
 
@@ -112,12 +139,12 @@ pip3 install -r requirements.txt pyinstaller==6.22.3
 
 2. Run PyInstaller. The data folders and the `--collect-data` options are needed, otherwise some languages, such as Turkish, fail to be split into sentences.
 ```
-pyinstaller -y --windowed --name DesktopTranslator --add-data "utils;utils" --collect-data sentence_splitter --collect-data pysbd --collect-all Pmw --collect-all ctranslate2 translator.py
+pyinstaller -y --windowed --name DesktopTranslator --add-data "utils;utils" --add-data "img/icon.png;img" --add-data "NOTICE.md;." --icon img/icon.png --collect-data sentence_splitter --collect-data pysbd --collect-all ctranslate2 qt_app.py
 ```
 3. Try the `*.exe` file under "dist\DesktopTranslator" to make sure it works.
 4. Download and install [NSIS](https://nsis.sourceforge.io/Download), and then create the installer with the script [installer.nsi](installer.nsi). It installs the app to "Program Files", and adds Start menu and Desktop shortcuts and an uninstaller.
 ```
-makensis /DVERSION=0.3.2 installer.nsi
+makensis /DVERSION=0.4.0 installer.nsi
 ```
 
 If you prefer to create the installer with the NSIS graphical interface, you can follow these steps instead of step 4:
@@ -138,13 +165,13 @@ If you get a permission error while trying to save the edited version of “Mode
 
 ### Build macOS App
 
-1. Install the requirements and PyInstaller, preferably in a virtual environment. A Python from [python.org](https://www.python.org/downloads/macos/) includes a recent Tk.
+1. Install the requirements and PyInstaller, preferably in a virtual environment.
 ```
 pip3 install -r requirements.txt pyinstaller==6.22.3
 ```
 2. Run PyInstaller. This creates "dist/DesktopTranslator.app", for the type of Mac you are using.
 ```
-pyinstaller -y --windowed --name DesktopTranslator --add-data "utils:utils" --collect-data sentence_splitter --collect-data pysbd --collect-all Pmw --collect-all ctranslate2 translator.py
+pyinstaller -y --windowed --name DesktopTranslator --add-data "utils:utils" --add-data "img/icon.png:img" --add-data "NOTICE.md:." --icon img/icon-macos.png --collect-data sentence_splitter --collect-data pysbd --collect-all ctranslate2 qt_app.py
 ```
 3. To share the app, compress it into a *.zip archive.
 ```

@@ -1,6 +1,30 @@
 # Changelog
 
 
+## v0.4.0
+
+### Changed
+
+- A new interface built with Qt (PySide6), replacing Tkinter. The Tkinter interface stays available in the `tk` branch
+- Right-to-left text, such as Arabic, is edited and selected right to left, and each paragraph follows its own direction
+- The app follows the dark mode of the system, and the text size can be changed in the View menu
+- The model is opened with one folder selection; its SentencePiece model is found automatically
+- Translation quality (Fast, Balanced, Accurate) and the other options are in Edit > Preferences
+- The translation appears as it is made, and Cancel keeps the part that is done
+- The source header shows the detected language and the number of words
+- A sentence that repeats in a text is translated once, so it is translated the same way everywhere
+- The Windows installer and the macOS app have a new icon
+
+### Added
+
+- File > Translate Document translates a plain text file into another file in the background, with progress, time left, and Cancel. The translated part is kept if you cancel
+- Texts over 20,000 words are not translated in the window; the app offers File > Translate Document instead
+- A warning when the computer may not have enough memory free for the model
+- A message when a PDF or Word file is opened, because only plain text files are supported
+- Search in the language lists, and a button to swap the source and target languages
+- Dropping a text file on the source pane opens it
+
+
 ## v0.3.2
 
 ### Added

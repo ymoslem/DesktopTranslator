@@ -1,0 +1,141 @@
+name: Check the build
+
+on:
+  push:
+    branches: [main, qt]
+    paths:
+      - qt_app.py
+      - img/icon.png
+      - img/icon-macos.png
+      - installer.nsi
+      - engine.py
+      - .github/workflows/check-build.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            name: macOS
+            separator: ":"
+            icon: img/icon-macos.png
+            program: dist/DesktopTranslator.app/Contents/MacOS/DesktopTranslator
+          - os: windows-latest
+            name: Windows
+            separator: ";"
+            icon: img/icon.png
+            program: dist/DesktopTranslator/DesktopTranslator.exe
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller==6.22.3 Pillow==13.0.0
+
+      - name: Build the app
+        run: |
+          pyinstaller -y --windowed --name DesktopTranslator \
+            --add-data "utils${{ matrix.separator }}utils" \
+            --add-data "img/icon.png${{ matrix.separator }}img" \
+            --add-data "NOTICE.md${{ matrix.separator }}." \
+            --icon ${{ matrix.icon }} \
+            --collect-data sentence_splitter \
+            --collect-data pysbd \
+            --collect-all ctranslate2 \
+            qt_app.py
+
+      - name: Measure the size
+        run: |
+          python - <<'PY' | tee size-${{ matrix.name }}.txt
+          import os, shutil, subprocess
+          name = "DesktopTranslator"
+          app = "dist/" + name + ".app"
+          if os.path.isdir(app):
+              # macOS: the app has links that must not be counted twice, so measure it as macOS does
+              unpacked = int(subprocess.check_output(["du", "-sk", app]).split()[0]) * 1024
+              subprocess.check_call(["ditto", "-c", "-k", "--keepParent", app, "measure.zip"])
+              archive = "measure.zip"
+          else:
+              unpacked = sum(os.path.getsize(os.path.join(d, f)) for d, _, fs in os.walk("dist/" + name) for f in fs)
+              archive = shutil.make_archive("measure", "zip", "dist", name)
+          print("${{ matrix.name }} Qt build: unpacked %.0f MB, zip %.0f MB" % (unpacked / 1e6, os.path.getsize(archive) / 1e6))
+          PY
+
+      - name: Check the app icon
+        run: |
+          if [ "${{ matrix.name }}" = "macOS" ]; then
+            ls -la dist/DesktopTranslator.app/Contents/Resources/*.icns
+          else
+            powershell -Command 'Add-Type -AssemblyName System.Drawing; $icon = [System.Drawing.Icon]::ExtractAssociatedIcon((Resolve-Path "dist/DesktopTranslator/DesktopTranslator.exe")); "icon of the exe: " + $icon.Width + " x " + $icon.Height'
+          fi
+
+      - name: Package the app
+        run: |
+          VERSION="0.4.0-dev"
+          if [ "${{ matrix.name }}" = "macOS" ]; then
+            ditto -c -k --keepParent dist/DesktopTranslator.app "DesktopTranslator_macOS_${VERSION}.zip"
+          else
+            choco install nsis -y --no-progress
+            "/c/Program Files (x86)/NSIS/makensis.exe" "//DVERSION=${VERSION}" "//DAPP_NAME=DesktopTranslator" installer.nsi
+          fi
+          ls -la DesktopTranslator_*
+
+      - name: List the biggest files
+        run: |
+          python - <<'PY'
+          import os
+          files = [(os.path.getsize(os.path.join(d, f)), os.path.join(d, f)) for d, _, fs in os.walk("dist") for f in fs]
+          for size, path in sorted(files, reverse=True)[:30]:
+              print("%7.1f MB  %s" % (size / 1e6, path))
+          PY
+
+      - name: Download the NLLB-200 model
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v0.3.0 --pattern "NLLB-200_distilled_600M_int8_ct2.zip" --dir model
+          python -m zipfile -e model/NLLB-200_distilled_600M_int8_ct2.zip model
+
+      - name: Translate English and Arabic samples, and take screenshots
+        run: |
+          printf 'Hello, how are you today?\nThe committee approved the new budget after a long debate.\n\nThank you very much for your help!\nDoes this work for you?\n' > en.txt
+          printf 'مرحبا بالعالم. كيف حالك اليوم؟\nوافقت اللجنة على الميزانية الجديدة بعد مناقشة طويلة.\n\nشكرا جزيلا لمساعدتك!\nهل هذا مناسب لك؟\nترجمة (Translation) تجريبية: 123.\n' > ar.txt
+          M=model/nllb-200-distilled-600M-int8
+          "${{ matrix.program }}" --demo $M $M/sentencepiece.model "Arabic (Modern Standard)" en.txt screenshot-en-ar-${{ matrix.name }}.png
+          "${{ matrix.program }}" --demo $M $M/sentencepiece.model "English" ar.txt screenshot-ar-en-${{ matrix.name }}.png
+          ls -la screenshot-*.png
+
+      - name: Install the Windows installer and run the installed app
+        if: matrix.name == 'Windows'
+        run: |
+          powershell -Command 'Start-Process -FilePath (Resolve-Path DesktopTranslator_Windows_*.exe) -ArgumentList "/S" -Wait'
+          APP="/c/Program Files/DesktopTranslator"
+          for file in lid.176.ftz nllb_languages.json m2m_languages.json fasttext_to_flores.json NOTICE.md; do
+            test -n "$(find "$APP" -name "$file" | head -1)" || { echo "Missing $file in the installed app"; exit 1; }
+          done
+          M=model/nllb-200-distilled-600M-int8
+          "$APP/DesktopTranslator.exe" --demo $M $M/sentencepiece.model "Arabic (Modern Standard)" en.txt screenshot-installed-Windows.png
+          ls -la screenshot-installed-Windows.png
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: qt-${{ matrix.name }}
+          path: |
+            size-${{ matrix.name }}.txt
+            screenshot-*.png
+            DesktopTranslator_*
+          if-no-files-found: ignore

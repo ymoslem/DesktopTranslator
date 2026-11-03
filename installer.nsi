@@ -4,7 +4,9 @@
 
 !include "MUI2.nsh"
 
-!define APP_NAME "DesktopTranslator"
+!ifndef APP_NAME
+  !define APP_NAME "DesktopTranslator"
+!endif
 !ifndef VERSION
   !define VERSION "0.0.0"
 !endif

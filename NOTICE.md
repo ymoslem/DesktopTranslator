@@ -16,14 +16,14 @@ The versions are in [requirements.txt](requirements.txt). The licenses are those
 | [pysbd](https://github.com/nipunsadvilkar/pySBD) | MIT |
 | [sentence-splitter](https://github.com/berkmancenter/mediacloud-sentence-splitter) | LGPL-3.0 |
 | [indic-nlp-library](https://github.com/anoopkunchukuttan/indic_nlp_library) | MIT |
-| [Pmw](https://pmw.sourceforge.net) | BSD |
+| [Qt for Python (PySide6)](https://pyside.org) | LGPL-3.0 |
 | [pandas](https://pandas.pydata.org) | BSD-3-Clause |
 
 [PyInstaller](https://pyinstaller.org), which builds the installers, is released under the GPL-2.0-or-later with a special exception that allows the programs it builds to use any license.
 
-### The LGPL library
+### The LGPL libraries
 
-sentence-splitter is released under the [LGPL-3.0](https://www.gnu.org/licenses/lgpl-3.0.html). The installers are folders of files, and the library is a separate set of files in them, so you can replace it with a modified version of your own. Its source code is at the link in the table.
+sentence-splitter and Qt for Python (PySide6, with Qt) are released under the [LGPL-3.0](https://www.gnu.org/licenses/lgpl-3.0.html). The installers are folders of files, and these libraries are separate files in them, so you can replace them with a modified version of your own. Their source code is at the links in the table, and the source of Qt is at [code.qt.io](https://code.qt.io).
 
 ## Language identification model
 
