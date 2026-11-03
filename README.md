@@ -2,7 +2,13 @@
 [![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.0-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.0/DesktopTranslator_macOS_0.4.0.zip)
 
 # DesktopTranslator
-Local cross-platform machine translation app, based on [CTranslate2](https://github.com/OpenNMT/CTranslate2). Your text stays on your computer.
+DesktopTranslator translates text and documents on your own computer. Nothing is sent to a server, and no internet connection is needed once you have a model. It runs [CTranslate2](https://github.com/OpenNMT/CTranslate2) models with SentencePiece, including the multilingual [NLLB-200](https://arxiv.org/abs/2207.04672) (200 languages) and [M2M-100](https://arxiv.org/abs/2010.11125) (100 languages) and bilingual models such as OPUS-MT.
+
+* The source language is detected, and each sentence is translated on its own, keeping your paragraphs
+* The translation appears as it is made, and you can cancel and keep what is done
+* Long files are translated in the background with <kbd>File</kbd> menu \> <kbd>Translate Document...</kbd>
+* Right-to-left languages such as Arabic are edited right to left, and the app follows the dark mode of your system
+* Installers for Windows and macOS, or run it from source
 
 ![DesktopTranslator](img/DesktopTranslator.png)
 
