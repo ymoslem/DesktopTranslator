@@ -384,5 +384,124 @@ check("\n" not in translate(window, text), "Join Lines from the preferences join
 dialog = qt_app.PreferencesDialog(window, 5, True, False, True)
 check(dialog.values() == (5, True, False, True), "the preferences window shows the saved values")
 window.close()
+
+# Downloading a model: the engine, with a local server
+import hashlib
+import http.server
+import io
+import shutil
+import threading
+import zipfile
+
+archive = io.BytesIO()
+with zipfile.ZipFile(archive, "w") as zipped:
+    zipped.writestr("tiny-model/model.bin", b"x" * 100000)
+    zipped.writestr("tiny-model/sentencepiece.model", b"sp")
+payload = archive.getvalue()
+
+
+class Handler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        for i in range(0, len(payload), 10000):
+            self.wfile.write(payload[i : i + 10000])
+            time.sleep(0.005)
+
+    def log_message(self, *args):
+        pass
+
+
+server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+threading.Thread(target=server.serve_forever, daemon=True).start()
+info = {"name": "Tiny model", "url": "http://127.0.0.1:%d/m.zip" % server.server_port, "sha256": hashlib.sha256(payload).hexdigest(),
+        "size": len(payload), "folder": "tiny-model"}
+models = engine_module.models_dir()
+progress = []
+folder = engine_module.download_model(info, on_progress=lambda done, total: progress.append((done, total)))
+check(folder == os.path.join(models, "tiny-model") and os.path.isfile(os.path.join(folder, "model.bin")) and engine_module.downloaded_model(info) == folder,
+      "a model is downloaded and extracted into the models folder")
+check(progress and progress[-1] == (len(payload), len(payload)) and os.listdir(models) == ["tiny-model"], "the progress is reported, and nothing else is left behind")
+try:
+    engine_module.download_model(dict(info, sha256="0" * 64))
+    check(False, "a damaged download is refused")
+except engine_module.EngineError as error:
+    check(error.title == "Download failed" and "damaged" in error.message and os.listdir(models) == ["tiny-model"], "a damaged download is refused, and removed")
+seen = []
+check(engine_module.download_model(info, is_cancelled=lambda: len(seen) > 0, on_progress=lambda done, total: seen.append(done)) is None
+      and os.listdir(models) == ["tiny-model"], "a cancelled download returns nothing, and leaves nothing")
+try:
+    engine_module.download_model(dict(info, url="http://127.0.0.1:1/m.zip"))
+    check(False, "an unreachable server is reported")
+except engine_module.EngineError as error:
+    check(error.title == "Download failed" and "Internet" in error.message, "an unreachable server is reported: " + error.message[:60])
+server.shutdown()
+shutil.rmtree(models)
+
+# The welcome dialog at the first start
+with open(SETTINGS_FILE, "w", encoding="utf-8") as file:
+    json.dump({}, file)
+shown = []
+choice = {"value": "later", "skip": False}
+
+
+def fake_welcome(self):
+    shown.append(1)
+    self.choice = choice["value"]
+    self.skip.setChecked(choice["skip"])
+    return 0
+
+
+def run_download(self):
+    self.start_time = time.time()
+    self.worker.start()
+    deadline = time.time() + 30
+    while self.worker.isRunning() and time.time() < deadline:
+        app.processEvents()
+        time.sleep(0.01)
+    app.processEvents()  # delivers the signal that the worker has finished
+    return 0
+
+
+qt_app.WelcomeDialog.exec = fake_welcome
+qt_app.DownloadDialog.exec = run_download
+fresh = qt_app.Window()
+fresh.offer_first_model()
+check(len(shown) == 1 and fresh.engine.translator is None and not fresh.preferences.get("skip_welcome", False),
+      "the welcome dialog is shown at the first start, and Later changes nothing")
+choice["skip"] = True
+fresh.offer_first_model()
+check(json.load(open(SETTINGS_FILE)).get("skip_welcome") is True, "Do not show this again is saved")
+fresh.offer_first_model()
+check(len(shown) == 2, "the welcome dialog is not shown again after that")
+fresh.preferences.set("skip_welcome", False)
+choice.update(value="download", skip=False)
+downloads = []
+
+
+def fake_download(is_cancelled=None, on_progress=None):
+    downloads.append(1)
+    on_progress(5e6, 10e6)
+    return FREN + "/ct2_model"
+
+
+qt_app.download_model = fake_download
+messages.clear()
+fresh.offer_first_model()
+check(downloads and fresh.engine.model_dir == FREN + "/ct2_model" and fresh.engine.sp_model is not None, "Download downloads the model, opens it, and finds its SentencePiece model")
+with open(SETTINGS_FILE, "w", encoding="utf-8") as file:
+    json.dump({}, file)
+fresh = qt_app.Window()
+qt_app.download_model = lambda is_cancelled=None, on_progress=None: (_ for _ in ()).throw(engine_module.EngineError("Download failed", "No Internet"))
+messages.clear()
+fresh.offer_first_model()
+check(messages and messages[-1] == ("Download failed", "No Internet") and fresh.engine.translator is None, "a failed download is explained")
+qt_app.download_model = lambda is_cancelled=None, on_progress=None: None
+fresh.offer_first_model()
+check("cancelled" in fresh.status_label.text() and fresh.engine.translator is None, "a cancelled download is said so")
+texts = lambda downloaded: [b.text() for b in qt_app.WelcomeDialog(fresh, downloaded).findChildren(qt_app.QPushButton)]
+check(texts(False)[0].startswith("Download ") and texts(True)[0].startswith("Use "), "the first button downloads the model, or uses the one that is already there")
+fresh.close()
 print("\n%d failure(s)" % len(failures))
 sys.exit(1 if failures else 0)

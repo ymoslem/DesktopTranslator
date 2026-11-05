@@ -1,9 +1,14 @@
 """The part of DesktopTranslator without interface code: models, languages, and translation."""
 import codecs
+import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
+import urllib.error
+import urllib.request
+import zipfile
 
 import ctranslate2
 import fasttext
@@ -12,7 +17,7 @@ from charset_normalizer import from_path
 
 from utils.model_info import read_vocabulary, detect_model_type
 from utils.paragraph_splitter import paragraph_tokenizer, join_lines, TextBuilder
-from utils.settings import load_settings, save_settings
+from utils.settings import load_settings, save_settings, settings_path
 
 AUTO_DETECT = "Auto detect"
 LONG_LINE_CHARS = 100000  # a text area takes minutes to display a single line much longer than this
@@ -20,6 +25,15 @@ REPETITION_PENALTY = 1.2  # the optional penalty for repeated words; a penalty o
 WORD_LIMIT = 20000  # a longer text is translated as a document, from a file to a file
 BATCH_SENTENCES = 8  # sentences translated in one call, so that progress and cancelling stay quick
 DOCUMENT_LINES = 200  # lines of a document that are split and translated together
+
+# The model that the app offers to download when there is none; the checksum is the SHA-256 of the archive
+MODEL_DOWNLOAD = {
+    "name": "NLLB-200 distilled 600M",
+    "url": "https://github.com/ymoslem/DesktopTranslator/releases/download/models/NLLB-200_distilled_600M_int8_ct2.zip",
+    "sha256": "7200fafd17973779a0f8aaeb0e09dda96b0e89d3bf07b65c26cecab7e4a42f1f",
+    "size": 582009597,
+    "folder": "nllb-200-distilled-600M-int8",
+}
 
 # The folder with the program files, also when the app is packaged
 DATA_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
@@ -93,6 +107,73 @@ def write_text_file(file_name, text):
     """Save a translation as UTF-8, without a byte order mark and with one final newline"""
     with open(file_name, "w", encoding="utf-8") as output:
         output.write(text.rstrip() + "\n")
+
+
+def models_dir():
+    """The per-user folder for the models that the app downloads"""
+    return os.path.join(os.path.dirname(settings_path()), "models")
+
+
+def downloaded_model(info=MODEL_DOWNLOAD):
+    """The folder of the model that the app downloaded earlier, or None"""
+    folder = os.path.join(models_dir(), info["folder"])
+    return folder if os.path.isfile(os.path.join(folder, "model.bin")) else None
+
+
+def download_model(info=MODEL_DOWNLOAD, is_cancelled=lambda: False, on_progress=None):
+    """Download a model archive, check its checksum, and extract it to the models folder
+
+    on_progress gets the bytes downloaded and the bytes in total.
+
+    Returns:
+        The model folder, or None if it was cancelled
+
+    Raises:
+        EngineError: There is not enough disk space, the download failed, or the file is damaged
+    """
+    target = models_dir()
+    try:
+        os.makedirs(target, exist_ok=True)
+        if shutil.disk_usage(target).free < 2.5 * info["size"]:
+            raise EngineError("Not enough disk space", "Downloading %s needs about %.1f GB of free disk space." % (info["name"], 2.5 * info["size"] / 1e9))
+    except OSError as error:
+        raise EngineError("Download failed", "The models folder cannot be used: " + str(error))
+    part = os.path.join(target, info["folder"] + ".zip.part")
+    extracted = os.path.join(target, info["folder"] + ".extracting")
+    digest, done = hashlib.sha256(), 0
+    try:
+        with urllib.request.urlopen(info["url"], timeout=30) as response, open(part, "wb") as archive:
+            total = int(response.headers.get("Content-Length") or info["size"])
+            while True:
+                if is_cancelled():
+                    return None
+                chunk = response.read(1 << 20)
+                if not chunk:
+                    break
+                archive.write(chunk)
+                digest.update(chunk)
+                done += len(chunk)
+                if on_progress:
+                    on_progress(done, total)
+        if digest.hexdigest() != info["sha256"]:
+            raise EngineError("Download failed", "The downloaded file is damaged (its checksum differs). Please try again.")
+        shutil.rmtree(extracted, ignore_errors=True)
+        with zipfile.ZipFile(part) as archive:
+            archive.extractall(extracted)
+        model = os.path.join(extracted, info["folder"])
+        if not os.path.isfile(os.path.join(model, "model.bin")):
+            raise EngineError("Download failed", "The downloaded archive does not hold the model.")
+        final = os.path.join(target, info["folder"])
+        shutil.rmtree(final, ignore_errors=True)
+        shutil.move(model, final)
+        return final
+    except (urllib.error.URLError, OSError, zipfile.BadZipFile) as error:
+        raise EngineError("Download failed", "The model could not be downloaded. Check your Internet connection and try again (%s)." % (getattr(error, "reason", None) or error))
+    finally:
+        for path in (part,):
+            if os.path.exists(path):
+                os.remove(path)
+        shutil.rmtree(extracted, ignore_errors=True)
 
 
 class Preferences:

@@ -36,11 +36,14 @@ from engine import (
     AUTO_DETECT,
     DATA_DIR,
     LONG_LINE_CHARS,
+    MODEL_DOWNLOAD,
     REPETITION_PENALTY,
     WORD_LIMIT,
     Engine,
     EngineError,
     Preferences,
+    download_model,
+    downloaded_model,
     find_sentencepiece,
     format_duration,
     longest_line,
@@ -131,6 +134,126 @@ class DocumentWorker(QThread):
             self.finished_ok.emit(done, total)
         except Exception as error:
             self.failed.emit(str(error))
+
+
+class ModelDownloadWorker(QThread):
+    """Downloads the model that the app offers, in the background"""
+
+    progress = Signal(float, float)
+    finished_ok = Signal(object)  # the model folder, or None if cancelled
+    failed = Signal(str, str)
+
+    def __init__(self):
+        super().__init__()
+        self.cancel = False
+
+    def run(self):
+        try:
+            folder = download_model(is_cancelled=lambda: self.cancel, on_progress=self.progress.emit)
+            self.finished_ok.emit(folder)
+        except EngineError as error:
+            self.failed.emit(error.title, error.message)
+        except Exception as error:
+            self.failed.emit("Download failed", str(error))
+
+
+class DownloadDialog(QDialog):
+    """Shows the progress of the download of a model, which can be cancelled"""
+
+    def __init__(self, parent, worker):
+        super().__init__(parent)
+        self.setWindowTitle("Download a Model")
+        self.worker = worker
+        self.folder = None  # the model folder when it is downloaded
+        self.error = None  # title and message of a failure
+        self.label = QLabel("Downloading " + MODEL_DOWNLOAD["name"] + "...")
+        self.bar = QProgressBar()
+        self.bar.setRange(0, 0)  # until the download starts
+        self.detail = QLabel("")
+        self.cancel_button = QPushButton("Cancel")
+        self.cancel_button.clicked.connect(self.cancel)
+        layout = QVBoxLayout(self)
+        for widget in (self.label, self.bar, self.detail, self.cancel_button):
+            layout.addWidget(widget)
+        self.setMinimumWidth(420)
+        worker.progress.connect(self.on_progress)
+        worker.finished_ok.connect(self.on_finished)
+        worker.failed.connect(self.on_failed)
+
+    def exec(self):
+        self.start_time = time.time()
+        self.worker.start()
+        return super().exec()
+
+    def cancel(self):
+        self.worker.cancel = True
+        self.cancel_button.setEnabled(False)
+        self.detail.setText("Cancelling...")
+
+    def on_progress(self, done, total):
+        self.bar.setRange(0, 1000)
+        self.bar.setValue(int(1000 * done / total))
+        detail = "%d of %d MB" % (done / 1048576, total / 1048576)
+        elapsed = time.time() - self.start_time
+        if elapsed > 3 and done:
+            detail += " (about " + format_duration(elapsed * (total - done) / done) + " left)"
+        self.detail.setText(detail)
+
+    def on_finished(self, folder):
+        self.folder = folder
+        self.worker.wait()
+        self.accept()
+
+    def on_failed(self, title, message):
+        self.error = (title, message)
+        self.worker.wait()
+        self.accept()
+
+    def reject(self):  # closing the window cancels the download
+        if self.worker.isRunning():
+            self.cancel()
+        else:
+            super().reject()
+
+
+class WelcomeDialog(QDialog):
+    """Offers a model at the first start, because the app cannot translate without one"""
+
+    def __init__(self, parent, downloaded):
+        super().__init__(parent)
+        self.setWindowTitle("Welcome to " + APP_NAME)
+        self.choice = ""  # download, open, or later
+        size = "%d MB" % (MODEL_DOWNLOAD["size"] / 1048576)
+        text = QLabel(
+            "<h3>Welcome to " + APP_NAME + "</h3>"
+            "<p>" + APP_NAME + " needs a translation model to work. The " + MODEL_DOWNLOAD["name"] + " model translates between 200 languages."
+            + ("" if downloaded else " It is a download of " + size + ".") + "</p>"
+            "<p>It is released under the <a href='https://creativecommons.org/licenses/by-nc/4.0/'>CC-BY-NC 4.0</a> license, "
+            "which does not allow commercial use. You can find other models in Help &gt; Get Models.</p>"
+        )
+        text.setWordWrap(True)
+        text.setOpenExternalLinks(True)
+        self.skip = QCheckBox("Do not show this again")
+        buttons = QDialogButtonBox()
+        use = buttons.addButton("Use " + MODEL_DOWNLOAD["name"] if downloaded else "Download " + MODEL_DOWNLOAD["name"], QDialogButtonBox.ButtonRole.AcceptRole)
+        other = buttons.addButton("Open a model I have...", QDialogButtonBox.ButtonRole.ActionRole)
+        later = buttons.addButton("Later", QDialogButtonBox.ButtonRole.RejectRole)
+        use.setDefault(True)
+        use.clicked.connect(lambda: self.finish("download"))
+        other.clicked.connect(lambda: self.finish("open"))
+        later.clicked.connect(lambda: self.finish("later"))
+        layout = QVBoxLayout(self)
+        for widget in (text, self.skip, buttons):
+            layout.addWidget(widget)
+        self.setMinimumWidth(460)
+
+    def finish(self, choice):
+        self.choice = choice
+        self.accept()
+
+    def reject(self):
+        self.choice = "later"
+        super().reject()
 
 
 class DocumentDialog(QDialog):
@@ -309,7 +432,7 @@ class Window(QMainWindow):
         self.source_text = SourceEdit()
         self.target_text = QTextEdit()
         self.source_text.setPlaceholderText("Type or paste text, or drop a text file here")
-        self.target_text.setPlaceholderText("Open a model to start (Ctrl+M), or choose Help > Get Models")
+        self.target_text.setPlaceholderText("Open a model to start (Ctrl+M)")
         for pane in (self.source_text, self.target_text):
             pane.setAcceptRichText(False)
             # Each paragraph takes its direction from its first strong character
@@ -448,6 +571,7 @@ class Window(QMainWindow):
         self.action(view_menu, "Actual Size", lambda: self.zoom(0), "Ctrl+0")
 
         help_menu = bar.addMenu("&Help")
+        self.action(help_menu, "Download " + MODEL_DOWNLOAD["name"] + "...", self.download_first_model)
         self.action(help_menu, "Get Models...", self.show_models)
         about = self.action(help_menu, "About " + APP_NAME, self.show_about)
         about.setMenuRole(QAction.MenuRole.NoRole)  # stays in the Help menu, also on macOS
@@ -532,7 +656,11 @@ class Window(QMainWindow):
     def open_model(self):
         start = os.path.dirname(self.engine.model_dir or self.pending_model or "")
         model_dir = QFileDialog.getExistingDirectory(self, "Open a CTranslate2 model folder", start)
-        if not model_dir or not self.load_model(model_dir):
+        if model_dir:
+            self.open_model_folder(model_dir)
+
+    def open_model_folder(self, model_dir):
+        if not self.load_model(model_dir):
             return
         candidates = find_sentencepiece(model_dir)
         if len(candidates) == 1:
@@ -610,6 +738,36 @@ class Window(QMainWindow):
             self.say("Last used model: " + short_text(os.path.basename(model_dir), 50) + " (loaded when you click Translate)")
         if os.path.isfile(sp_path):
             self.pending_sp = sp_path
+
+    def offer_first_model(self):
+        """At the first start, offer the model that is easiest to begin with"""
+        if self.engine.translator is not None or self.pending_model or self.preferences.get("skip_welcome", False):
+            return
+        dialog = WelcomeDialog(self, downloaded_model() is not None)
+        dialog.exec()
+        if dialog.skip.isChecked():
+            self.preferences.set("skip_welcome", True)
+            self.preferences.write()
+        if dialog.choice == "download":
+            self.download_first_model()
+        elif dialog.choice == "open":
+            self.open_model()
+
+    def download_first_model(self):
+        """Download the model of the welcome dialog, unless it is there, and open it"""
+        folder = downloaded_model()
+        if folder is None:
+            dialog = DownloadDialog(self, ModelDownloadWorker())
+            dialog.exec()
+            if dialog.error:
+                QMessageBox.critical(self, dialog.error[0], dialog.error[1])
+                self.say("The model could not be downloaded.")
+                return
+            if dialog.folder is None:
+                self.say("Download cancelled.")
+                return
+            folder = dialog.folder
+        self.open_model_folder(folder)
 
     def ensure_loaded(self):
         """Load the models of the last session, when they are needed"""
@@ -919,6 +1077,8 @@ def main():
         app.styleHints().setColorScheme(Qt.ColorScheme.Dark)
     window = Window()
     window.show()
+    if "--demo" not in sys.argv:
+        QTimer.singleShot(0, window.offer_first_model)
     if len(sys.argv) > 1 and sys.argv[1] == "--demo":
         model_dir, sp_model, target, text_file, output = sys.argv[2:7]
 
