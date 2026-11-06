@@ -33,7 +33,7 @@ DesktopTranslator translates text and documents on your own computer. Nothing is
 [![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.0-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.0/DesktopTranslator_Windows_0.4.0.exe)
 [![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.0-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.0/DesktopTranslator_macOS_0.4.0.zip)
 
-<img src="img/installer.png" width="60%">
+<img src="img/installer.png" width="497">
 
 The installers are not signed. On macOS (Apple Silicon), open **System Settings** > **Privacy & Security** and click **Open Anyway** the first time you launch the app. On Windows, SmartScreen may show a warning; click **More info** > **Run anyway**.
 
