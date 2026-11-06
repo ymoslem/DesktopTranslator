@@ -61,6 +61,7 @@ QUALITY = {"Fast": 2, "Balanced": 3, "Accurate": 5}  # beam sizes
 REPOSITORY_URL = "https://github.com/ymoslem/DesktopTranslator"  # shown in About; a website can be added later
 NOTICE_URL = REPOSITORY_URL + "/blob/main/NOTICE.md"
 RELEASES_URL = REPOSITORY_URL + "/releases"
+ISSUES_URL = REPOSITORY_URL + "/issues"
 DOWNLOADS = [
     ("NLLB-200 distilled 600M", "200 languages; the smallest and fastest",
      "https://github.com/ymoslem/DesktopTranslator/releases/download/models/NLLB-200_distilled_600M_int8_ct2.zip"),
@@ -573,6 +574,7 @@ class Window(QMainWindow):
         help_menu = bar.addMenu("&Help")
         self.action(help_menu, "Download " + MODEL_DOWNLOAD["name"] + "...", self.download_first_model)
         self.action(help_menu, "Get Models...", self.show_models)
+        self.action(help_menu, "Report an Issue...", lambda: QDesktopServices.openUrl(QUrl(ISSUES_URL)))
         about = self.action(help_menu, "About " + APP_NAME, self.show_about)
         about.setMenuRole(QAction.MenuRole.NoRole)  # stays in the Help menu, also on macOS
 

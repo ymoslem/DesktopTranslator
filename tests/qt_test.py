@@ -365,6 +365,13 @@ larger = next(a for a in window.findChildren(qt_app.QAction) if a.text() == "Lar
 check(any(k.toString() == "Ctrl+=" for k in larger.shortcuts()), "Ctrl+= also makes the text larger")
 about = next(a for a in window.findChildren(qt_app.QAction) if a.text().startswith("About"))
 check(about.menuRole() == qt_app.QAction.MenuRole.NoRole and any(a is about for a in window.menuBar().actions()[-1].menu().actions()), "About is in the Help menu")
+report = next(a for a in window.menuBar().actions()[-1].menu().actions() if a.text() == "Report an Issue...")
+opened = []
+real_open = qt_app.QDesktopServices.openUrl
+qt_app.QDesktopServices.openUrl = staticmethod(lambda url: opened.append(url.toString()) or True)
+report.trigger()
+qt_app.QDesktopServices.openUrl = real_open
+check(opened == ["https://github.com/ymoslem/DesktopTranslator/issues"], "Report an Issue in the Help menu opens the issues page: " + str(opened))
 
 # Preferences, and the next session
 window.preferences.set("beam_size", 5)
