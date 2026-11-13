@@ -1,5 +1,5 @@
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.0-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.0/DesktopTranslator_Windows_0.4.0.exe)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.0-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.0/DesktopTranslator_macOS_0.4.0.zip)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.1-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.1/DesktopTranslator_Windows_0.4.1.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.1-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.1/DesktopTranslator_macOS_0.4.1.zip)
 
 # DesktopTranslator
 DesktopTranslator translates text and documents on your own computer. Nothing is sent to a server, and no internet connection is needed once you have a model. It runs [CTranslate2](https://github.com/OpenNMT/CTranslate2) models with SentencePiece, including the multilingual [NLLB-200](https://arxiv.org/abs/2207.04672) (200 languages) and [M2M-100](https://arxiv.org/abs/2010.11125) (100 languages) and bilingual models such as OPUS-MT.
@@ -31,8 +31,8 @@ DesktopTranslator translates text and documents on your own computer. Nothing is
     
 ## Download DesktopTranslator
    
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.0-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.0/DesktopTranslator_Windows_0.4.0.exe)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.0-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.0/DesktopTranslator_macOS_0.4.0.zip)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.1-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.1/DesktopTranslator_Windows_0.4.1.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.1-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.1/DesktopTranslator_macOS_0.4.1.zip)
 
 <img src="img/installer.png" width="497">
 
