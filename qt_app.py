@@ -39,6 +39,7 @@ from engine import (
     Preferences,
     downloaded_model,
     find_sentencepiece,
+    gpu_count,
     format_duration,
     longest_line,
     memory_warning,
@@ -362,7 +363,7 @@ class Window(QMainWindow):
                 return False
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
-            changed = self.engine.load_model(model_dir)
+            changed = self.engine.load_model(model_dir, self.preferences.get("device", "cpu"))
         except EngineError as error:
             QMessageBox.critical(self, error.title, error.message)
             return False
@@ -379,7 +380,8 @@ class Window(QMainWindow):
 
     def show_model_name(self, model_dir):
         self.target_text.setPlaceholderText("Translation")
-        self.model_label.setText("Model: " + short_text(os.path.basename(os.path.normpath(model_dir)), 40))
+        self.model_label.setText("Model: " + short_text(os.path.basename(os.path.normpath(model_dir)), 40)
+                                 + (" (GPU)" if self.engine.device == "cuda" else ""))
         self.model_label.setToolTip(model_dir)
 
     def restore_target(self):
@@ -409,6 +411,18 @@ class Window(QMainWindow):
             self.say("Last used model: " + short_text(os.path.basename(model_dir), 50) + " (loaded when you click Translate)")
         if os.path.isfile(sp_path):
             self.pending_sp = sp_path
+
+    def load_last_model(self):
+        """At the start, load the model of the last session if the preferences say so; a model that may not fit in memory waits"""
+        if not self.pending_model or not self.preferences.get("load_at_start", True):
+            return
+        if memory_warning(self.pending_model):
+            self.say("Last used model: " + short_text(os.path.basename(self.pending_model), 50)
+                     + " (loaded when you click Translate, because it may not fit in memory)")
+            return
+        self.say("Loading the model...")
+        QApplication.processEvents()  # shows the window and the message before the pause
+        self.ensure_loaded()
 
     def offer_first_model(self):
         """At the first start, offer the model that is easiest to begin with"""
@@ -694,14 +708,28 @@ class Window(QMainWindow):
         dialog = PreferencesDialog(
             self, self.preferences.get("beam_size", 3), self.preferences.get("join_lines", False),
             self.preferences.get("remember_model_paths", True), self.preferences.get("repetition_penalty", 1.0) > 1.0,
+            self.preferences.get("device", "cpu"), gpu_count() > 0, self.preferences.get("load_at_start", True),
         )
         if dialog.exec():
             beam_size, join_lines, remember, repetition = dialog.values()
+            self.preferences.set("load_at_start", dialog.load_at_start.isChecked())
+            self.change_device(dialog.device())
             self.preferences.set("repetition_penalty", REPETITION_PENALTY if repetition else 1.0)
             self.preferences.set("beam_size", beam_size)
             self.preferences.set("join_lines", join_lines)
             self.preferences.set("remember_model_paths", remember)
             self.save_settings()
+
+    def change_device(self, device):
+        """Use the CPU or the GPU; a loaded model is loaded again, unless a translation is running"""
+        previous = self.preferences.get("device", "cpu")
+        if device == previous:
+            return
+        self.preferences.set("device", device)
+        if self.worker is not None:
+            self.say("The device changes when a model is opened.")
+        elif self.engine.translator is not None and not self.load_model(self.engine.model_dir):
+            self.preferences.set("device", previous)  # the model did not fit on the GPU; the CPU model is still loaded
 
     def show_models(self):
         dialog = QDialog(self)
@@ -749,6 +777,7 @@ def main():
     window = Window()
     window.show()
     if "--demo" not in sys.argv:
+        QTimer.singleShot(0, window.load_last_model)
         QTimer.singleShot(0, window.offer_first_model)
     if len(sys.argv) > 1 and sys.argv[1] == "--demo":
         model_dir, sp_model, target, text_file, output = sys.argv[2:7]

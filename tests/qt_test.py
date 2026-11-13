@@ -16,10 +16,12 @@ import utils.settings as settings_module
 SETTINGS_FILE = os.path.join(tempfile.mkdtemp(), "settings.json")
 settings_module.settings_path = lambda: SETTINGS_FILE
 
-from PySide6.QtCore import QMimeData, QUrl, Qt
-from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QMessageBox
+from PySide6.QtCore import QMimeData, QPointF, QUrl, Qt
+from PySide6.QtGui import QEnterEvent
+from PySide6.QtWidgets import QApplication, QComboBox, QFileDialog, QInputDialog, QMessageBox, QToolTip
 
 import engine as engine_module
+import gui.widgets
 import gui.workers
 import qt_app
 from utils.paragraph_splitter import TextBuilder, paragraph_detokenizer
@@ -391,6 +393,23 @@ text = "The committee met on Monday to discuss the\nnew budget and decided to ap
 check("\n" not in translate(window, text), "Join Lines from the preferences joins the lines")
 dialog = qt_app.PreferencesDialog(window, 5, True, False, True)
 check(dialog.values() == (5, True, False, True), "the preferences window shows the saved values")
+check(dialog.load_at_start.isChecked() and not dialog.load_at_start.isEnabled(), "loading at start is on by default, and off for a model that is not remembered")
+
+# Loading the last model at the start
+starter = qt_app.Window()
+starter.preferences.set("load_at_start", False)
+starter.load_last_model()
+check(starter.engine.translator is None and starter.pending_model, "with the option off, the last model waits for the first translation")
+starter.preferences.set("load_at_start", True)
+real_warning = qt_app.memory_warning
+qt_app.memory_warning = lambda model_dir: "This model needs about 6.1 GB of memory, and 2.0 GB is free now."
+starter.load_last_model()
+check(starter.engine.translator is None and starter.pending_model and "may not fit in memory" in starter.status_label.text(),
+      "a model that may not fit in memory waits for the first translation")
+qt_app.memory_warning = real_warning
+starter.load_last_model()
+check(starter.engine.translator is not None and starter.engine.sp_model is not None and not starter.pending_model, "the last model is loaded at the start")
+starter.close()
 window.close()
 
 # Downloading a model: the engine, with a local server
@@ -564,6 +583,39 @@ def no_cuda():
 ct2.get_cuda_device_count = no_cuda
 check(engine_module.gpu_count() == 0, "a missing CUDA driver means no GPU")
 ct2.Translator, ct2.get_cuda_device_count, ct2.get_supported_compute_types = real
+
+# The device in the Preferences
+count_boxes = lambda dialog: len(dialog.findChildren(QComboBox))
+check(count_boxes(qt_app.PreferencesDialog(window, 3, False, True, False)) == 1
+      and qt_app.PreferencesDialog(window, 3, False, True, False, "cuda", False).device() == "cpu", "without a GPU, the Preferences offer no device")
+with_gpu = qt_app.PreferencesDialog(window, 3, False, True, False, "cuda", True)
+check(count_boxes(with_gpu) == 2 and with_gpu.device() == "cuda", "with a GPU, the Preferences show the device in use")
+signs = with_gpu.findChildren(gui.widgets.InfoSign)
+signs[0].enterEvent(QEnterEvent(QPointF(1, 1), QPointF(1, 1), QPointF(1, 1)))
+check(len(signs) == 6 and QToolTip.isVisible() and QToolTip.text() == signs[0].toolTip(), "an (i) sign shows its tooltip at once")
+QToolTip.hideText()
+with_gpu.device_box.setCurrentText("CPU")
+check(with_gpu.device() == "cpu" and with_gpu.values()[0] == 3, "the device can be set to the CPU")
+
+gpu_full.clear()
+ct2.get_cuda_device_count = lambda: 1
+ct2.get_supported_compute_types = lambda name: {"float16", "float32"}
+device_window = qt_app.Window()
+device_window.load_model(NLLB)
+real_translator = device_window.engine.translator
+ct2.Translator = fake_translator
+device_window.change_device("cuda")
+check(device_window.preferences.get("device", "cpu") == "cuda" and device_window.engine.device == "cuda"
+      and device_window.model_label.text().endswith("(GPU)"), "choosing the GPU loads the model again on the GPU")
+device_window.change_device("cpu")
+check(device_window.engine.device == "cpu" and not device_window.model_label.text().endswith("(GPU)"), "choosing the CPU loads it on the CPU again")
+gpu_full.append(True)
+messages.clear()
+device_window.change_device("cuda")
+check(messages and "out of memory" in messages[-1][1] and device_window.preferences.get("device", "cpu") == "cpu"
+      and device_window.engine.device == "cpu", "a model that does not fit on the GPU is explained, and the CPU stays")
+ct2.Translator, ct2.get_cuda_device_count, ct2.get_supported_compute_types = real
+device_window.close()
 
 print("\n%d failure(s)" % len(failures))
 sys.exit(1 if failures else 0)

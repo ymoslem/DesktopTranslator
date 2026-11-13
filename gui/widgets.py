@@ -1,6 +1,6 @@
 """Text and language widgets"""
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QComboBox, QCompleter, QTextEdit
+from PySide6.QtWidgets import QComboBox, QCompleter, QLabel, QTextEdit, QToolTip
 
 
 class SourceEdit(QTextEdit):
@@ -48,3 +48,16 @@ class LanguageBox(QComboBox):
             return False
         self.setCurrentIndex(index)
         return True
+
+
+class InfoSign(QLabel):
+    """An (i) sign that shows its tooltip at once, instead of after the usual delay"""
+
+    def __init__(self, text):
+        super().__init__("\u24d8")
+        self.setToolTip(text)
+        self.setCursor(Qt.CursorShape.WhatsThisCursor)
+
+    def enterEvent(self, event):
+        QToolTip.showText(self.mapToGlobal(self.rect().bottomLeft()), self.toolTip(), self, self.rect())
+        super().enterEvent(event)

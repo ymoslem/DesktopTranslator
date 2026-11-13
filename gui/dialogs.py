@@ -8,14 +8,17 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QHBoxLayout,
     QLabel,
     QProgressBar,
     QPushButton,
     QVBoxLayout,
+    QWidget,
 )
 
 from engine import MODEL_DOWNLOAD, format_duration
-from gui.constants import APP_NAME, QUALITY
+from gui.constants import APP_NAME, DEVICES, QUALITY
+from gui.widgets import InfoSign
 
 
 class DownloadDialog(QDialog):
@@ -178,31 +181,60 @@ class DocumentDialog(QDialog):
             super().reject()
 
 
+def with_info(widget, text):
+    """The widget followed by an (i) sign, which shows the text as a tooltip"""
+    row = QHBoxLayout()
+    row.setContentsMargins(0, 0, 0, 0)
+    row.addWidget(widget)
+    row.addWidget(InfoSign(text))
+    row.addStretch()
+    holder = QWidget()
+    holder.setLayout(row)
+    return holder
+
+
 class PreferencesDialog(QDialog):
-    def __init__(self, parent, beam_size, join_lines, remember, repetition):
+    def __init__(self, parent, beam_size, join_lines, remember, repetition, device="cpu", gpu=False, load_at_start=True):
         super().__init__(parent)
         self.setWindowTitle("Preferences")
+        self.gpu = gpu  # an NVIDIA GPU is available, so the device can be chosen
+        self.device_box = QComboBox()
+        self.device_box.addItems(DEVICES)
+        self.device_box.setCurrentText(DEVICES[1] if device == "cuda" and gpu else DEVICES[0])
         self.quality = QComboBox()
         self.quality.addItems(QUALITY)
         self.quality.setCurrentText(next((n for n, b in QUALITY.items() if b == beam_size), "Balanced"))
-        self.quality.setToolTip("Fast takes less time; Accurate searches more candidate translations (a larger beam size)")
-        self.repetition = QCheckBox("Avoid repeated words (a repetition penalty of 1.2; it scored lower in our tests)")
+        self.repetition = QCheckBox("Avoid repeated words")
         self.repetition.setChecked(repetition)
-        self.join_lines = QCheckBox("Join lines inside a paragraph (for text from PDF or OCR)")
+        self.join_lines = QCheckBox("Join lines inside a paragraph")
         self.join_lines.setChecked(join_lines)
         self.remember = QCheckBox("Remember the last model and target language")
         self.remember.setChecked(remember)
+        self.load_at_start = QCheckBox("Load the last model at start")
+        self.load_at_start.setChecked(load_at_start)
+        self.load_at_start.setEnabled(remember)  # only a remembered model can be loaded
+        self.remember.toggled.connect(self.load_at_start.setEnabled)
         form = QFormLayout()
-        form.addRow("Translation quality:", self.quality)
-        form.addRow(self.repetition)
-        form.addRow(self.join_lines)
-        form.addRow(self.remember)
+        form.addRow("Translation quality:", with_info(
+            self.quality, "Fast takes less time. Accurate searches more candidate translations (a larger beam size)."))
+        if gpu:
+            form.addRow("Run on:", with_info(
+                self.device_box, "GPU can be faster than the CPU, if its memory is large enough for the model."))
+        form.addRow(with_info(self.repetition, "Applies a repetition penalty of 1.2. It scored lower in our tests."))
+        form.addRow(with_info(self.join_lines, "For text from PDF or OCR, where lines break inside a paragraph."))
+        form.addRow(with_info(self.remember, "Opens the last model again at the next start, and selects its last target language."))
+        form.addRow(with_info(self.load_at_start, "Loads the model when the app starts, so the first translation is not slower. "
+                                                  "A model that may not fit in memory is loaded when you translate."))
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout = QVBoxLayout(self)
         layout.addLayout(form)
         layout.addWidget(buttons)
+
+    def device(self):
+        """The device to use, cuda or cpu"""
+        return "cuda" if self.gpu and self.device_box.currentText() == DEVICES[1] else "cpu"
 
     def values(self):
         return QUALITY[self.quality.currentText()], self.join_lines.isChecked(), self.remember.isChecked(), self.repetition.isChecked()
