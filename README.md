@@ -149,7 +149,7 @@ pyinstaller -y --windowed --name DesktopTranslator --add-data "utils;utils" --ad
 3. Try the `*.exe` file under "dist\DesktopTranslator" to make sure it works.
 4. Download and install [NSIS](https://nsis.sourceforge.io/Download), and then create the installer with the script [installer.nsi](installer.nsi). It installs the app to "Program Files", and adds Start menu and Desktop shortcuts and an uninstaller.
 ```
-makensis /DVERSION=0.4.0 installer.nsi
+makensis /DVERSION=0.4.1 installer.nsi
 ```
 
 If you prefer to create the installer with the NSIS graphical interface, you can follow these steps instead of step 4:
