@@ -6,7 +6,8 @@ FLORES_DIR holds flores200_dataset (https://dl.fbaipublicfiles.com/nllb/flores20
 NLLB_DIR is a NLLB-200 CTranslate2 folder with sentencepiece.model, translated with a beam size of 3 as in the app.
 Each NAME=CT2_DIR=KIND is a language model converted with ct2-transformers-converter. Its tokenizer is read from
 CT2_DIR (copy the tokenizer files there when converting), or from TOKENIZER, a folder or a Hugging Face name. KIND is "generic" for a short instruction, "tgprompt" for the longer instruction of TranslateGemma as a
-plain message (both work with any chat model), or "translategemma" for the format that TranslateGemma was trained with. The language models translate one sentence at a time, with greedy decoding.
+plain message (both work with any chat model), or "translategemma" for the format that TranslateGemma was trained with. The language models translate one sentence at a time, with greedy decoding,
+or with beam search if the environment variable LLM_EVAL_BEAM is set to a beam size above 1. LLM_EVAL_SENTENCES sets the number of sentences (50 by default).
 It needs transformers and sacrebleu. The results, with every translation, are saved to RESULTS.json.
 """
 import json
@@ -18,7 +19,8 @@ import ctranslate2
 import sentencepiece as spm
 from sacrebleu.metrics import CHRF
 
-SENTENCES, STEP, BATCH = int(os.environ.get("LLM_EVAL_SENTENCES", 50)), 20, 8
+SENTENCES, BATCH = int(os.environ.get("LLM_EVAL_SENTENCES", 50)), 8
+BEAM = int(os.environ.get("LLM_EVAL_BEAM", 1))
 SOURCE = ("eng_Latn", "en", "English")
 TARGETS = [("fra_Latn", "fr", "French"), ("arb_Arab", "ar", "Arabic"), ("tur_Latn", "tr", "Turkish"), ("hin_Deva", "hi", "Hindi")]
 PROMPT = "Translate the following text from {source} to {target}. Output only the translation.\n\n{text}"
@@ -33,7 +35,8 @@ TRANSLATEGEMMA_PROMPT = (
 
 def read(flores, code):
     with open(os.path.join(flores, "flores200_dataset", "devtest", code + ".devtest"), encoding="utf-8") as file:
-        return [line.rstrip("\n") for line in file][::STEP][:SENTENCES]
+        lines = [line.rstrip("\n") for line in file]
+    return lines[:: max(len(lines) // SENTENCES, 1)][:SENTENCES]  # evenly spaced; every 20th line for 50 sentences
 
 
 def load_nllb(model_dir):
@@ -68,7 +71,7 @@ def translate_llm(generator, tokenizer, kind, sources, target):
     for i in range(0, len(sources), BATCH):
         prompts = [build_prompt(tokenizer, kind, text, target) for text in sources[i : i + BATCH]]
         tokens = [tokenizer.convert_ids_to_tokens(tokenizer.encode(p, add_special_tokens=False)) for p in prompts]
-        results = generator.generate_batch(tokens, max_length=300, sampling_topk=1, beam_size=1, include_prompt_in_result=False)
+        results = generator.generate_batch(tokens, max_length=300, sampling_topk=1, beam_size=BEAM, include_prompt_in_result=False)
         for result in results:
             ids = tokenizer.convert_tokens_to_ids(result.sequences[0])
             outputs.append(tokenizer.decode(ids, skip_special_tokens=True).strip())
@@ -99,7 +102,7 @@ if __name__ == "__main__":
             print(name, target[2], "chrF++ %.1f, length ratio %.2f" % results[name]["scores"][target[2]], flush=True)
         results[name]["seconds"] = round(results[name]["seconds"])
         with open(output, "w", encoding="utf-8") as file:
-            json.dump({"sentences": SENTENCES, "sources": sources, "references": references, "results": results}, file, ensure_ascii=False, indent=1)
+            json.dump({"sentences": SENTENCES, "beam_size_llm": BEAM, "sources": sources, "references": references, "results": results}, file, ensure_ascii=False, indent=1)
 
     start = time.time()
     sp, translator = load_nllb(nllb)
