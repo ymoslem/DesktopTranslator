@@ -511,5 +511,59 @@ check("cancelled" in fresh.status_label.text() and fresh.engine.translator is No
 texts = lambda downloaded: [b.text() for b in qt_app.WelcomeDialog(fresh, downloaded).findChildren(qt_app.QPushButton)]
 check(texts(False)[0].startswith("Download ") and texts(True)[0].startswith("Use "), "the first button downloads the model, or uses the one that is already there")
 fresh.close()
+
+# GPU selection, with CTranslate2 replaced, because the test machine may have no NVIDIA GPU
+ct2 = engine_module.ctranslate2
+real = (ct2.Translator, ct2.get_cuda_device_count, ct2.get_supported_compute_types)
+calls, gpu_full = [], []
+
+
+def fake_translator(model_dir, **kwargs):
+    calls.append(kwargs)
+    if kwargs.get("device") == "cuda" and gpu_full:
+        raise RuntimeError("CUDA failed with error out of memory")
+    return object()
+
+
+def load_on(device, gpus, types):
+    ct2.get_cuda_device_count = lambda: gpus
+    ct2.get_supported_compute_types = lambda name: types
+    calls.clear()
+    loaded = engine_module.Engine()
+    loaded.load_model(NLLB, device)
+    return loaded, calls[-1]
+
+
+ct2.Translator = fake_translator
+engine, used = load_on("cpu", 1, {"float16"})
+check(engine.device == "cpu" and used["device"] == "cpu", "the CPU is the default device")
+engine, used = load_on("cuda", 0, {"float16"})
+check(engine.device == "cpu" and used["device"] == "cpu", "without a GPU, the CPU is used")
+engine, used = load_on("cuda", 1, {"int8", "float16", "int8_float16", "float32"})
+check(engine.device == "cuda" and used["device"] == "cuda" and used["compute_type"] == "float16", "a GPU runs a model as float16")
+engine, used = load_on("cuda", 1, {"int8", "float32"})
+check(used["compute_type"] == "float32", "a GPU without float16 runs a model as float32")
+engine, used = load_on("cuda", 1, {"int8"})
+check(used["compute_type"] == "default", "a GPU with no known type keeps the type of the model")
+engine = engine_module.Engine()
+gpu_full.append(True)
+ct2.get_cuda_device_count = lambda: 1
+ct2.get_supported_compute_types = lambda name: {"float32"}
+try:
+    engine.load_model(NLLB, "cuda")
+    raised = None
+except engine_module.EngineError as error:
+    raised = error
+check(raised is not None and "out of memory" in raised.message and engine.translator is None and engine.device == "cpu", "a GPU that cannot load the model is explained, and nothing changes")
+
+
+def no_cuda():
+    raise RuntimeError("CUDA driver not found")
+
+
+ct2.get_cuda_device_count = no_cuda
+check(engine_module.gpu_count() == 0, "a missing CUDA driver means no GPU")
+ct2.Translator, ct2.get_cuda_device_count, ct2.get_supported_compute_types = real
+
 print("\n%d failure(s)" % len(failures))
 sys.exit(1 if failures else 0)

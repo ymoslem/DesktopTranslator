@@ -271,6 +271,26 @@ def memory_warning(model_dir, info=None):
     return ""
 
 
+GPU_COMPUTE_TYPES = ("float16", "int8_float16", "float32")  # in order of preference; plain int8 was slow on GPUs
+
+
+def gpu_count():
+    """Number of NVIDIA GPUs that CTranslate2 can use; 0 if there is none, or if CUDA is not installed"""
+    try:
+        return ctranslate2.get_cuda_device_count()
+    except Exception:
+        return 0
+
+
+def gpu_compute_type():
+    """The first of GPU_COMPUTE_TYPES that the GPU supports, or the type saved in the model"""
+    try:
+        supported = ctranslate2.get_supported_compute_types("cuda")
+    except Exception:
+        return "default"
+    return next((kind for kind in GPU_COMPUTE_TYPES if kind in supported), "default")
+
+
 SENTENCEPIECE_NAMES = ("sentencepiece.model", "sentencepiece.bpe.model", "source.spm", "source.spm.model")
 
 
@@ -311,6 +331,7 @@ class Engine:
 
         self.lid_model = None  # the fastText language identification model, loaded once
         self.translator = None
+        self.device = "cpu"  # "cuda" when the model runs on an NVIDIA GPU
         self.sp_model = None
         self.model_dir = ""
         self.model_type = None  # "m2m", "nllb", "other", or None until a model is selected
@@ -334,20 +355,34 @@ class Engine:
     def is_model(self, model_dir):
         return os.path.isdir(model_dir) and ctranslate2.contains_model(model_dir)
 
-    def load_model(self, model_dir):
-        """Load a CTranslate2 model; returns True if its kind differs from the previous model"""
+    def load_model(self, model_dir, device="cpu"):
+        """Load a CTranslate2 model; returns True if its kind differs from the previous model
+
+        The device is "cpu", or "cuda" for an NVIDIA GPU. Without a usable GPU, "cuda" falls back to the CPU;
+        the device in use is in self.device. The compute type of the files is kept on the CPU, and on a GPU
+        the model is converted when loaded to the first type the GPU supports (see GPU_COMPUTE_TYPES).
+        """
         if not self.is_model(model_dir):
             raise EngineError(
                 "Invalid CTranslate2 model",
                 "Please make sure you select the direcotry of a valid CTranslate2 model!",
             )
         changed = self.inspect_model(model_dir)
-        self.translator = ctranslate2.Translator(
-            model_dir,
-            device="cpu",
-            inter_threads=2,
-            intra_threads=int(os.cpu_count() / 2),
-        )
+        if device == "cuda" and gpu_count() > 0:
+            try:
+                translator = ctranslate2.Translator(model_dir, device="cuda", compute_type=gpu_compute_type())
+            except RuntimeError as error:  # for example, not enough memory on the GPU
+                raise EngineError("The GPU could not load the model", str(error) + "\n\nYou can choose the CPU in the Preferences.")
+            self.device = "cuda"
+        else:
+            translator = ctranslate2.Translator(
+                model_dir,
+                device="cpu",
+                inter_threads=2,
+                intra_threads=int(os.cpu_count() / 2),
+            )
+            self.device = "cpu"
+        self.translator = translator
         self.model_dir = model_dir
         return changed
 
