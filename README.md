@@ -19,9 +19,10 @@ DesktopTranslator translates text and documents on your own computer. Nothing is
 1. [Using DesktopTranslator](#using-desktoptranslator)
 1. [Run from Source](#run-from-source)
 1. [Translation Models](#translation-models)
-    * [French-to-English Generic Model](#french-to-english-generic-model)
-    * [M2M-100 Multilingual Model](#m2m-100-multilingual-model)
     * [NLLB-200 Multilingual Model](#nllb-200-multilingual-model)
+    * [M2M-100 Multilingual Model](#m2m-100-multilingual-model)
+    * [OPUS Models](#opus-models)
+    * [French-to-English Generic Model](#french-to-english-generic-model)
 1. [[Optional] Build Stand-alone Executable](#build-stand-alone-executable)
    * [Build Windows Installer](#build-windows-installer)
    * [Build macOS App](#build-macos-app)
@@ -86,18 +87,22 @@ On Windows, activate the virtual environment with `.venv\Scripts\activate`.
 
 DesktopTranslator supports CTranslate2 models with their SentencePiece subwording models (you need both). If you have a model for OpenNMT-py, OpenNMT-tf, or FairSeq, you can [convert it to the CTranslate2 format](https://github.com/OpenNMT/CTranslate2#quickstart).
 
-### French-to-English Generic Model
+### NLLB-200 Multilingual Model
 
-If you would like to try out the app and you do not have a model, you can download my [French-to-English generic model here](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.3/fren.zip). 
-1. Unzip the `fren.zip` archive of the French-to-English generic model you just downloaded. It has two folders, `ct2_model` for the CTranslate2 model and `sp_model` for the SentencePiece subwording models of French (source) and English (target).
-2. In DesktopTranslator, click the <kbd>Open Model...</kbd> button, and select the `ct2_model` folder.
-3. When you are asked for the SentencePiece model, navigate to the `sp_model` folder, and select `fr.model`.
-4. In the left text area, type some text in French or use the <kbd>File</kbd> menu \> <kbd>Open Text...</kbd> to open a *.txt file.
-5. Click the <kbd>Translate</kbd> button. The default translation quality is "Balanced"; you can change it in the Preferences.
+DesktopTranslator supports [**NLLB-200**](https://arxiv.org/abs/2207.04672) ([NLLB Team et al., 2022](https://arxiv.org/abs/2207.04672)), a multilingual model that can translate between 200 languages. Note that Meta released the NLLB-200 models under the [CC-BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) license, which does not allow commercial use. To use them, please follow these steps:
+1. Download one of the NLLB-200 models, converted to the CTranslate2 format with int8 quantization:  
+    a. [NLLB-200 distilled 600M-parameter model](https://github.com/ymoslem/DesktopTranslator/releases/download/models/NLLB-200_distilled_600M_int8_ct2.zip); the smallest and fastest, and good for most uses. You can also use the <kbd>Help</kbd> menu \> <kbd>Get Models...</kbd>; or  
+    b. [NLLB-200 distilled 1.3B-parameter model](https://github.com/ymoslem/DesktopTranslator/releases/download/models/NLLB-200_distilled_1.3B_int8_ct2.zip); slower and needs more memory, but sometimes more accurate; or  
+    c. [NLLB-200 3.3B-parameter model](https://pretrained-nmt-models.s3.us-west-004.backblazeb2.com/CTranslate2/nllb/nllb-200_3.3B_int8_ct2.zip) (3.1 GB); the largest, slowest, and needs the most memory. This archive does not include a SentencePiece model, so also download [NLLB-200_sentencepiece.model](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_sentencepiece.model).
+2. Extract the *.zip archive.
+3. In DesktopTranslator, click the <kbd>Open Model...</kbd> button, and select the model folder, for example `nllb-200-distilled-600M-int8`. Its `sentencepiece.model` is used automatically. For the 3.3B model, when you are asked, select the `NLLB-200_sentencepiece.model` file you downloaded.
+4. From the <kbd>To</kbd> list, select the language to which you want to translate. You can type to search the list. Language varieties are grouped, for example "Arabic (Modern Standard)" and "Arabic (Egyptian)". The source language is detected automatically; to choose it yourself, use the <kbd>From</kbd> list.
+5. Click the <kbd>Translate</kbd> button. You can click <kbd>Cancel</kbd> to stop a long translation.
+
 
 ### M2M-100 Multilingual Model
 
-Now, DesktopTranslator supports [**M2M-100**](https://github.com/pytorch/fairseq/tree/main/examples/m2m_100) ([Fan et al., 2020](https://arxiv.org/abs/2010.11125)), a multilingual model that can translate between 100 languages.
+DesktopTranslator also supports [**M2M-100**](https://github.com/pytorch/fairseq/tree/main/examples/m2m_100) ([Fan et al., 2020](https://arxiv.org/abs/2010.11125)), a multilingual model that can translate between 100 languages.
     
 To use M2M-100 models in DesktopTranslator, please follow these steps:
 1. Download one of the M2M-100 models, converted to the CTranslate2 format:  
@@ -109,17 +114,7 @@ To use M2M-100 models in DesktopTranslator, please follow these steps:
 5. In the left text area, type some text in any language or use the <kbd>File</kbd> menu \> <kbd>Open Text...</kbd> to open a *.txt file.
 6. Click the <kbd>Translate</kbd> button.
    
-### NLLB-200 Multilingual Model
 
-DesktopTranslator also supports [**NLLB-200**](https://arxiv.org/abs/2207.04672) ([NLLB Team et al., 2022](https://arxiv.org/abs/2207.04672)), a multilingual model that can translate between 200 languages. Note that Meta released the NLLB-200 models under the [CC-BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) license, which does not allow commercial use. To use them, please follow these steps:
-1. Download one of the NLLB-200 models, converted to the CTranslate2 format with int8 quantization:  
-    a. [NLLB-200 distilled 600M-parameter model](https://github.com/ymoslem/DesktopTranslator/releases/download/models/NLLB-200_distilled_600M_int8_ct2.zip); the smallest and fastest, and good for most uses. You can also use the <kbd>Help</kbd> menu \> <kbd>Get Models...</kbd>; or  
-    b. [NLLB-200 distilled 1.3B-parameter model](https://github.com/ymoslem/DesktopTranslator/releases/download/models/NLLB-200_distilled_1.3B_int8_ct2.zip); slower and needs more memory, but sometimes more accurate; or  
-    c. [NLLB-200 3.3B-parameter model](https://pretrained-nmt-models.s3.us-west-004.backblazeb2.com/CTranslate2/nllb/nllb-200_3.3B_int8_ct2.zip) (3.1 GB); the largest, slowest, and needs the most memory. This archive does not include a SentencePiece model, so also download [NLLB-200_sentencepiece.model](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.3.0/NLLB-200_sentencepiece.model).
-2. Extract the *.zip archive.
-3. In DesktopTranslator, click the <kbd>Open Model...</kbd> button, and select the model folder, for example `nllb-200-distilled-600M-int8`. Its `sentencepiece.model` is used automatically. For the 3.3B model, when you are asked, select the `NLLB-200_sentencepiece.model` file you downloaded.
-4. From the <kbd>To</kbd> list, select the language to which you want to translate. You can type to search the list. Language varieties are grouped, for example "Arabic (Modern Standard)" and "Arabic (Egyptian)". The source language is detected automatically; to choose it yourself, use the <kbd>From</kbd> list.
-5. Click the <kbd>Translate</kbd> button. You can click <kbd>Cancel</kbd> to stop a long translation.
 
 ### OPUS Models
 
@@ -128,6 +123,17 @@ OPUS models ([Tatoeba-Challenge](https://github.com/Helsinki-NLP/Tatoeba-Challen
 ct2-opus-mt-converter --model_dir opus_model_dir --output_dir ct2_model_dir --quantization int8
 ```
 The source and target tokenization SentencePiece models can be found in the same archive of the downloaded model.
+
+
+### French-to-English Generic Model
+
+If you would like a small model to try the app, you can download my [French-to-English generic model here](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.3/fren.zip). 
+1. Unzip the `fren.zip` archive of the French-to-English generic model you just downloaded. It has two folders, `ct2_model` for the CTranslate2 model and `sp_model` for the SentencePiece subwording models of French (source) and English (target).
+2. In DesktopTranslator, click the <kbd>Open Model...</kbd> button, and select the `ct2_model` folder.
+3. When you are asked for the SentencePiece model, navigate to the `sp_model` folder, and select `fr.model`.
+4. In the left text area, type some text in French or use the <kbd>File</kbd> menu \> <kbd>Open Text...</kbd> to open a *.txt file.
+5. Click the <kbd>Translate</kbd> button. The default translation quality is "Balanced"; you can change it in the Preferences.
+
 
 ## [Optional] Build Stand-alone Executable
 
