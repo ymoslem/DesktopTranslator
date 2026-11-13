@@ -272,6 +272,7 @@ def memory_warning(model_dir, info=None):
     return ""
 
 
+CUDA_LIBRARY_NAMES = ("cublas", "cudnn", "cudart", "libcu", ".dll")  # a load error that mentions one of these means a missing CUDA library
 GPU_COMPUTE_TYPES = ("float16", "int8_float16", "float32")  # in order of preference; plain int8 was slow on GPUs
 
 
@@ -373,7 +374,10 @@ class Engine:
             try:
                 translator = ctranslate2.Translator(model_dir, device="cuda", compute_type=gpu_compute_type())
             except RuntimeError as error:  # for example, not enough memory on the GPU
-                raise EngineError("The GPU could not load the model", str(error) + "\n\nYou can choose the CPU in the Preferences.")
+                message = str(error)
+                if any(name in message.lower() for name in CUDA_LIBRARY_NAMES):
+                    message += "\n\nCTranslate2 needs the NVIDIA CUDA 12 libraries to use a GPU. Install CUDA 12.x from developer.nvidia.com/cuda-downloads."
+                raise EngineError("The GPU could not load the model", message + "\n\nYou can choose the CPU in the Preferences.")
             self.device = "cuda"
         else:
             translator = ctranslate2.Translator(

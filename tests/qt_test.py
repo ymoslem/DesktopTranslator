@@ -581,6 +581,26 @@ try:
 except engine_module.EngineError as error:
     raised = error
 check(raised is not None and "out of memory" in raised.message and engine.translator is None and engine.device == "cpu", "a GPU that cannot load the model is explained, and nothing changes")
+check("CUDA 12" not in raised.message, "a GPU that is out of memory is not blamed on missing CUDA libraries")
+gpu_full.clear()
+missing = ct2.Translator
+
+
+def no_cublas(model_dir, **kwargs):
+    if kwargs.get("device") == "cuda":
+        raise RuntimeError("Library cublas64_12.dll is not found or cannot be loaded")
+    return object()
+
+
+ct2.Translator = no_cublas
+try:
+    engine_module.Engine().load_model(NLLB, "cuda")
+    raised = None
+except engine_module.EngineError as error:
+    raised = error
+ct2.Translator = missing
+check(raised is not None and "cublas64_12.dll" in raised.message and "CUDA 12.x" in raised.message and "Preferences" in raised.message,
+      "a missing CUDA library is named, with what to install")
 
 
 def no_cuda():

@@ -55,7 +55,7 @@ Right-to-left languages such as Arabic, Persian, Urdu, and Hebrew are displayed 
 | Option | Effect |
 |---|---|
 | Translation quality | Fast (beam size 2), Balanced (3, the default), or Thorough (5, slower) |
-| Run on | The CPU, or an NVIDIA GPU when one is found. It is tested on an RTX 5090 with Linux. On Windows, CTranslate2 needs the CUDA 12 libraries, which we have not tested yet; please report what you see in an [issue](https://github.com/ymoslem/DesktopTranslator/issues) |
+| Run on | The CPU, or an NVIDIA GPU when one is found. It is tested on an RTX 5090 with Linux. CTranslate2 needs the NVIDIA driver and the [CUDA 12 libraries](https://opennmt.net/CTranslate2/installation.html) to use a GPU. If the option does not appear, CTranslate2 found no usable GPU, because the computer has none or the driver or the libraries are missing. We have not tested Windows yet, so please report what you see in an [issue](https://github.com/ymoslem/DesktopTranslator/issues) |
 | Avoid repeated words | A repetition penalty of 1.2, off by default because translations scored higher without it in tests (`tests/repetition_penalty_eval.py`) |
 | Join lines inside a paragraph | For text from PDF files or OCR, where lines break in the middle of a sentence |
 | Remember the last model and target language | Opens the same model the next time |
