@@ -615,6 +615,7 @@ check(count_boxes(with_gpu) == 2 and with_gpu.device() == "cuda", "with a GPU, t
 signs = with_gpu.findChildren(gui.widgets.InfoSign)
 signs[0].enterEvent(QEnterEvent(QPointF(1, 1), QPointF(1, 1), QPointF(1, 1)))
 check(len(signs) == 6 and QToolTip.isVisible() and QToolTip.text() == signs[0].toolTip(), "an (i) sign shows its tooltip at once")
+check(all(". " not in sign.toolTip() for sign in signs) and signs[0].toolTip().count("\n") == 1, "the tooltip of an (i) sign has a line for each sentence")
 QToolTip.hideText()
 with_gpu.device_box.setCurrentText("CPU")
 check(with_gpu.device() == "cpu" and with_gpu.values()[0] == 3, "the device can be set to the CPU")

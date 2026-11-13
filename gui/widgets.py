@@ -58,6 +58,10 @@ class InfoSign(QLabel):
         self.setToolTip(text)
         self.setCursor(Qt.CursorShape.WhatsThisCursor)
 
+    def setToolTip(self, text):
+        """A plain tooltip does not wrap, so each sentence gets its own line"""
+        super().setToolTip(text.replace(". ", ".\n"))
+
     def enterEvent(self, event):
         QToolTip.showText(self.mapToGlobal(self.rect().bottomLeft()), self.toolTip(), self, self.rect())
         super().enterEvent(event)
