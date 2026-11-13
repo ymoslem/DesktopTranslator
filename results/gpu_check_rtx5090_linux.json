@@ -1,0 +1,74 @@
+{
+ "machine": {
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "processor": "x86_64",
+  "cores": 120,
+  "python": "3.12.3",
+  "ctranslate2": "4.8.4",
+  "gpus": [
+   "NVIDIA GeForce RTX 5090, 595.91.07, 32607 MiB, 12.0"
+  ],
+  "supported_compute_types": [
+   "bfloat16",
+   "float16",
+   "float32",
+   "int8",
+   "int8_bfloat16",
+   "int8_float16",
+   "int8_float32"
+  ]
+ },
+ "device": "cuda",
+ "model": "nllb-200-distilled-600M-int8",
+ "sentences": 200,
+ "words": 4387,
+ "beam": 3,
+ "batch": 8,
+ "rows": {
+  "app": {
+   "load_seconds": 4.829475949984044,
+   "seconds": 5.252719265175983,
+   "words_per_second": 835.1864583901422,
+   "chrf": 68.74496217460778,
+   "gpu_memory_mb": 2408,
+   "same_as_first": 200,
+   "device_used": "cuda"
+  },
+  "float16": {
+   "load_seconds": 3.4411598849110305,
+   "seconds": 5.505324932048097,
+   "words_per_second": 796.8648634092417,
+   "chrf": 68.74496217460778,
+   "gpu_memory_mb": 2472,
+   "same_as_first": 200,
+   "device_used": "cuda"
+  },
+  "int8_float16": {
+   "load_seconds": 0.44685803004540503,
+   "seconds": 6.280147542944178,
+   "words_per_second": 698.5504671667862,
+   "chrf": 68.86803386121836,
+   "gpu_memory_mb": 1512,
+   "same_as_first": 126,
+   "device_used": "cuda"
+  },
+  "int8": {
+   "load_seconds": 0.5927500480320305,
+   "seconds": 6.097486183978617,
+   "words_per_second": 719.4768249786304,
+   "chrf": 68.64182722260513,
+   "gpu_memory_mb": 1512,
+   "same_as_first": 132,
+   "device_used": "cuda"
+  },
+  "float32": {
+   "load_seconds": 1.3711666429881006,
+   "seconds": 6.93807925703004,
+   "words_per_second": 632.3075648861826,
+   "chrf": 68.63308494408464,
+   "gpu_memory_mb": 3306,
+   "same_as_first": 186,
+   "device_used": "cuda"
+  }
+ }
+}

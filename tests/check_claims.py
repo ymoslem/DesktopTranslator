@@ -1,0 +1,78 @@
+"""Check the claims that the README, the CHANGELOG and the tooltips of the app make about measured results.
+
+Usage: python tests/check_claims.py
+
+It reads the files in results/ (see results/README.md), recomputes what it can, and stops with an error
+if a claim and the results disagree. The claims are
+  - a single word is detected correctly about 60% of the time (CHANGELOG)
+  - beam size 1 scores lower than beam size 3 in French, Arabic, Turkish and Hindi, with chrF++ and COMET
+  - beam sizes 2 and 5 are comparable to beam size 3 (CHANGELOG, tooltip of Translation quality)
+  - a larger beam size takes longer (tooltip of Translation quality, README)
+  - a model on a GPU runs as float16, tested on an NVIDIA RTX 5090 with Linux (CHANGELOG, README)
+"""
+import json
+import os
+import random
+
+RESULTS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "results")
+LANGUAGES = ("French", "Arabic", "Turkish", "Hindi")
+BEAMS = ("1", "2", "3", "5")
+RESAMPLES, TOLERANCE = 1000, 1e-9
+
+
+def load(name):
+    with open(os.path.join(RESULTS, name), encoding="utf-8") as file:
+        return json.load(file)
+
+
+def bootstrap(scores_a, scores_b):
+    """The paired bootstrap of tests/comet_beam.py: the difference in the mean with a 95% interval"""
+    rng, n = random.Random(1), len(scores_a)
+    differences = []
+    for _ in range(RESAMPLES):
+        chosen = [rng.randrange(n) for _ in range(n)]
+        differences.append(sum(scores_a[i] - scores_b[i] for i in chosen) / n)
+    differences.sort()
+    return differences[int(0.025 * RESAMPLES)], differences[int(0.975 * RESAMPLES) - 1]
+
+
+def check(condition, claim):
+    assert condition, "FAILED: " + claim
+    print("ok   " + claim)
+
+
+def main():
+    lid = load("lid_confidence.json")
+    accuracy = lid["by_length"]["1"]["accuracy"]
+    check(abs(accuracy - 0.60) < 0.05, "a single word is detected correctly about 60%% of the time (%.1f%%)" % (100 * accuracy))
+
+    beam, comet = load("beam_nllb600_m3.json"), load("comet_beam_nllb600_m3.json")
+    check(beam["model"] == "nllb-200-distilled-600M-int8" and set(beam["scores"]) == set(LANGUAGES) and beam["sentences"] == 200,
+          "the beam results are for NLLB-200 600M, four languages, 200 sentences")
+    for name in LANGUAGES:
+        segments = comet["segments"][name]
+        for other in ("1", "2", "5"):  # the stored COMET intervals are what the segment scores give
+            low, high = bootstrap(segments[other], segments["3"])
+            stored = comet["bootstrap_vs_beam_3"][name][other]
+            check(abs(low - stored["low"]) < TOLERANCE and abs(high - stored["high"]) < TOLERANCE,
+                  "%s, beam size %s: the COMET interval is recomputed from the segment scores" % (name, other))
+        for metric, stats in (("chrF++", beam["bootstrap_vs_beam_3"][name]), ("COMET", comet["bootstrap_vs_beam_3"][name])):
+            one = stats["1"]
+            check(one["high"] < 0, "%s, beam size 1 scores lower than 3 (%s, interval [%.4f, %.4f])" % (name, metric, one["low"], one["high"]))
+            for other in ("2", "5"):
+                interval = stats[other]
+                check(interval["low"] <= 0 <= interval["high"],
+                      "%s, beam size %s is comparable to 3 (%s, interval [%.4f, %.4f])" % (name, other, metric, interval["low"], interval["high"]))
+        times = [beam["seconds"][name][b] for b in BEAMS]
+        check(times == sorted(times), "%s, a larger beam size takes longer (%s s)" % (name, ", ".join("%.0f" % t for t in times)))
+
+    gpu = load("gpu_check_rtx5090_linux.json")
+    check("RTX 5090" in gpu["machine"]["gpus"][0] and gpu["machine"]["platform"].startswith("Linux"), "the GPU results are from an NVIDIA RTX 5090 with Linux")
+    rows = gpu["rows"]
+    check(rows["app"]["device_used"] == "cuda" and rows["app"]["chrf"] == rows["float16"]["chrf"]
+          and rows["float16"]["same_as_first"] == gpu["sentences"], "the app runs a model on the GPU as float16, with the same translations")
+    print("\nAll claims agree with the results.")
+
+
+if __name__ == "__main__":
+    main()
