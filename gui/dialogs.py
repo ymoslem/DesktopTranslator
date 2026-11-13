@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from engine import MODEL_DOWNLOAD, format_duration
-from gui.constants import APP_NAME, DEVICES, QUALITY
+from gui.constants import APP_NAME, DEFAULT_QUALITY, DEVICES, QUALITY
 from gui.widgets import InfoSign
 
 
@@ -203,7 +203,7 @@ class PreferencesDialog(QDialog):
         self.device_box.setCurrentText(DEVICES[1] if device == "cuda" and gpu else DEVICES[0])
         self.quality = QComboBox()
         self.quality.addItems(QUALITY)
-        self.quality.setCurrentText(next((n for n, b in QUALITY.items() if b == beam_size), "Balanced"))
+        self.quality.setCurrentText(next((n for n, b in QUALITY.items() if b == beam_size), DEFAULT_QUALITY))
         self.repetition = QCheckBox("Avoid repeated words")
         self.repetition.setChecked(repetition)
         self.join_lines = QCheckBox("Join lines inside a paragraph")
@@ -216,7 +216,8 @@ class PreferencesDialog(QDialog):
         self.remember.toggled.connect(self.load_at_start.setEnabled)
         form = QFormLayout()
         form.addRow("Translation quality:", with_info(
-            self.quality, "Fast takes less time. Accurate searches more candidate translations (a larger beam size)."))
+            self.quality, "A larger beam size searches more candidate translations and takes longer. "
+                          "In our tests, beam size 1 was clearly worse than 3, and beam size 5 was not clearly better."))
         if gpu:
             form.addRow("Run on:", with_info(
                 self.device_box, "GPU can be faster than the CPU, if its memory is large enough for the model."))

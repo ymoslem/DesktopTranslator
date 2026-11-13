@@ -51,7 +51,7 @@ Right-to-left languages such as Arabic, Persian, Urdu, and Hebrew are displayed 
 
 | Option | Effect |
 |---|---|
-| Translation quality | Fast (beam size 2), Balanced (3, the default), or Accurate (5, slower and sometimes better) |
+| Translation quality | Fast (beam size 2), Balanced (3, the default), or Thorough (5, slower) |
 | Avoid repeated words | A repetition penalty of 1.2, off by default because translations scored higher without it in tests (`tests/repetition_penalty_eval.py`) |
 | Join lines inside a paragraph | For text from PDF files or OCR, where lines break in the middle of a sentence |
 | Remember the last model and target language | Opens the same model the next time |
