@@ -254,7 +254,7 @@ class Window(QMainWindow):
         self.action(help_menu, "Get Models...", self.show_models)
         self.action(help_menu, "Report an Issue...", lambda: QDesktopServices.openUrl(QUrl(ISSUES_URL)))
         about = self.action(help_menu, "About " + APP_NAME, self.show_about)
-        about.setMenuRole(QAction.MenuRole.NoRole)  # stays in the Help menu, also on macOS
+        about.setMenuRole(QAction.MenuRole.AboutRole)  # macOS moves it to the first place of the application menu
 
     def focused_pane(self):
         return self.target_text if self.target_text.hasFocus() else self.source_text
@@ -763,14 +763,20 @@ class Window(QMainWindow):
         dialog.exec()
 
     def show_about(self):
-        QMessageBox.about(
-            self, "About " + APP_NAME,
-            "<h3>" + APP_NAME + "</h3>Version " + VERSION + "<br>Developed by Yasmin Moslem<br>"
+        box = QMessageBox(self)
+        box.setWindowTitle("About " + APP_NAME)
+        box.setTextFormat(Qt.TextFormat.RichText)
+        box.setTextInteractionFlags(Qt.TextInteractionFlag.TextBrowserInteraction)
+        box.setIconPixmap(self.windowIcon().pixmap(64, 64))
+        box.setText("<b>" + APP_NAME + "</b>")  # only the name is bold; the rest is the informative text
+        box.setInformativeText(
+            "Version " + VERSION + "<br>Developed by Yasmin Moslem<br>"
             "<a href='" + REPOSITORY_URL + "'>github.com/ymoslem/DesktopTranslator</a>"
-            "<p>Translation with CTranslate2 and SentencePiece. Released under the MIT license.</p>"
+            "<p>" + APP_NAME + " is released under the MIT license. It depends on CTranslate2 and SentencePiece for translation with compatible models.</p>"
             "<p>Built with Qt for Python (LGPL v3). "
-            "The licenses of all the components are in <a href='" + NOTICE_URL + "'>NOTICE</a>.</p>",
+            "The licenses of all the components are in <a href='" + NOTICE_URL + "'>NOTICE</a>.</p>"
         )
+        box.exec()
 
     def closeEvent(self, event):
         self.preferences.set("geometry", bytes(self.saveGeometry().toBase64()).decode())

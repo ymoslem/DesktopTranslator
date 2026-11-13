@@ -367,7 +367,14 @@ check(sizes == [14, (15, 15), (16, 16), (15, 15), (14, 14)], "the text can be ma
 larger = next(a for a in window.findChildren(qt_app.QAction) if a.text() == "Larger Text")
 check(any(k.toString() == "Ctrl+=" for k in larger.shortcuts()), "Ctrl+= also makes the text larger")
 about = next(a for a in window.findChildren(qt_app.QAction) if a.text().startswith("About"))
-check(about.menuRole() == qt_app.QAction.MenuRole.NoRole and any(a is about for a in window.menuBar().actions()[-1].menu().actions()), "About is in the Help menu")
+check(about.menuRole() == qt_app.QAction.MenuRole.AboutRole and any(a is about for a in window.menuBar().actions()[-1].menu().actions()), "About has the About role, and is in the Help menu except on macOS")
+shown = []
+real_exec = qt_app.QMessageBox.exec
+qt_app.QMessageBox.exec = lambda box: shown.append((box.text(), box.informativeText())) or 0
+window.show_about()
+qt_app.QMessageBox.exec = real_exec
+check(shown and qt_app.APP_NAME in shown[0][0] and "Version " + qt_app.VERSION in shown[0][1] and qt_app.NOTICE_URL in shown[0][1]
+      and qt_app.APP_NAME not in shown[0][1].split("<br>")[0], "About shows the name as the main text, and the version and links below")
 report = next(a for a in window.menuBar().actions()[-1].menu().actions() if a.text() == "Report an Issue...")
 opened = []
 real_open = qt_app.QDesktopServices.openUrl
