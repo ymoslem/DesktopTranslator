@@ -5,6 +5,7 @@ on:
     branches: [main, qt]
     paths:
       - qt_app.py
+      - gui/**
       - img/icon.png
       - img/icon-macos.png
       - installer.nsi

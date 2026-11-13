@@ -20,6 +20,7 @@ from PySide6.QtCore import QMimeData, QUrl, Qt
 from PySide6.QtWidgets import QApplication, QFileDialog, QInputDialog, QMessageBox
 
 import engine as engine_module
+import gui.workers
 import qt_app
 from utils.paragraph_splitter import TextBuilder, paragraph_detokenizer
 
@@ -493,18 +494,18 @@ def fake_download(is_cancelled=None, on_progress=None):
     return FREN + "/ct2_model"
 
 
-qt_app.download_model = fake_download
+gui.workers.download_model = fake_download
 messages.clear()
 fresh.offer_first_model()
 check(downloads and fresh.engine.model_dir == FREN + "/ct2_model" and fresh.engine.sp_model is not None, "Download downloads the model, opens it, and finds its SentencePiece model")
 with open(SETTINGS_FILE, "w", encoding="utf-8") as file:
     json.dump({}, file)
 fresh = qt_app.Window()
-qt_app.download_model = lambda is_cancelled=None, on_progress=None: (_ for _ in ()).throw(engine_module.EngineError("Download failed", "No Internet"))
+gui.workers.download_model = lambda is_cancelled=None, on_progress=None: (_ for _ in ()).throw(engine_module.EngineError("Download failed", "No Internet"))
 messages.clear()
 fresh.offer_first_model()
 check(messages and messages[-1] == ("Download failed", "No Internet") and fresh.engine.translator is None, "a failed download is explained")
-qt_app.download_model = lambda is_cancelled=None, on_progress=None: None
+gui.workers.download_model = lambda is_cancelled=None, on_progress=None: None
 fresh.offer_first_model()
 check("cancelled" in fresh.status_label.text() and fresh.engine.translator is None, "a cancelled download is said so")
 texts = lambda downloaded: [b.text() for b in qt_app.WelcomeDialog(fresh, downloaded).findChildren(qt_app.QPushButton)]

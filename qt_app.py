@@ -8,17 +8,12 @@ import os
 import sys
 import time
 
-from PySide6.QtCore import QByteArray, Qt, QThread, QTimer, QUrl, Signal
+from PySide6.QtCore import QByteArray, Qt, QTimer, QUrl
 from PySide6.QtGui import QAction, QDesktopServices, QIcon, QKeySequence, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
-    QCheckBox,
-    QComboBox,
-    QCompleter,
     QDialog,
-    QDialogButtonBox,
     QFileDialog,
-    QFormLayout,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -42,7 +37,6 @@ from engine import (
     Engine,
     EngineError,
     Preferences,
-    download_model,
     downloaded_model,
     find_sentencepiece,
     format_duration,
@@ -51,348 +45,22 @@ from engine import (
     read_text_file,
     write_text_file,
 )
+from gui.constants import (
+    APP_NAME,
+    DEFAULT_TEXT_SIZE,
+    DOWNLOADS,
+    ISSUES_URL,
+    NOTICE_URL,
+    RELEASES_URL,
+    REPOSITORY_URL,
+    TARGET_PLACEHOLDER,
+    VERSION,
+)
+from gui.dialogs import DocumentDialog, DownloadDialog, PreferencesDialog, WelcomeDialog
+from gui.helpers import short_text
+from gui.widgets import LanguageBox, SourceEdit
+from gui.workers import DocumentWorker, ModelDownloadWorker, Worker
 from utils.paragraph_splitter import TextBuilder, paragraph_detokenizer
-
-APP_NAME = "DesktopTranslator"
-VERSION = "0.4.0"
-TARGET_PLACEHOLDER = "Select a language..."
-DEFAULT_TEXT_SIZE = 14
-QUALITY = {"Fast": 2, "Balanced": 3, "Accurate": 5}  # beam sizes
-REPOSITORY_URL = "https://github.com/ymoslem/DesktopTranslator"  # shown in About; a website can be added later
-NOTICE_URL = REPOSITORY_URL + "/blob/main/NOTICE.md"
-RELEASES_URL = REPOSITORY_URL + "/releases"
-ISSUES_URL = REPOSITORY_URL + "/issues"
-DOWNLOADS = [
-    ("NLLB-200 distilled 600M", "200 languages; the smallest and fastest",
-     "https://github.com/ymoslem/DesktopTranslator/releases/download/models/NLLB-200_distilled_600M_int8_ct2.zip"),
-    ("NLLB-200 distilled 1.3B", "200 languages; slower, needs more memory, sometimes more accurate",
-     "https://github.com/ymoslem/DesktopTranslator/releases/download/models/NLLB-200_distilled_1.3B_int8_ct2.zip"),
-    ("M2M-100 418M", "100 languages; small",
-     "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.1/M2M-100_418m_parameter_model_ct2.zip"),
-    ("M2M-100 1.2B", "100 languages; larger",
-     "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.1/M2M-100_12b_parameter_model_ct2.zip"),
-    ("French to English", "A small model to try the app",
-     "https://github.com/ymoslem/DesktopTranslator/releases/download/v0.2.3/fren.zip"),
-]
-
-
-def short_text(text, limit):
-    """Shorten a long text, such as a path, by leaving out the middle"""
-    if len(text) <= limit:
-        return text
-    head = (limit - 3) // 3
-    return text[:head] + "..." + text[-(limit - 3 - head):]
-
-
-class Worker(QThread):
-    """Translates in the background, and reports with signals"""
-
-    progress = Signal(int)
-    batch_done = Signal(list)
-    done = Signal(list)
-    cancelled = Signal()
-    failed = Signal(str)
-
-    def __init__(self, engine, batches, beam_size, target_lang_code, src_prefix, repetition_penalty):
-        super().__init__()
-        self.engine, self.batches = engine, batches
-        self.beam_size, self.target_lang_code, self.src_prefix = beam_size, target_lang_code, src_prefix
-        self.repetition_penalty = repetition_penalty
-        self.cancel = False
-
-    def run(self):
-        try:
-            translations = self.engine.translate(
-                self.batches, self.beam_size, self.target_lang_code, self.src_prefix,
-                is_cancelled=lambda: self.cancel, on_progress=self.progress.emit,
-                repetition_penalty=self.repetition_penalty, on_batch=lambda sentences: self.batch_done.emit(list(sentences)),
-            )
-            self.cancelled.emit() if translations is None else self.done.emit(translations)
-        except Exception as error:
-            self.failed.emit(str(error))
-
-
-class DocumentWorker(QThread):
-    """Translates a file into another file in the background"""
-
-    progress = Signal(int, int)
-    finished_ok = Signal(int, int)
-    failed = Signal(str)
-
-    def __init__(self, engine, input_path, output_path, target, source_name, beam_size, join, penalty):
-        super().__init__()
-        self.engine, self.input_path, self.output_path = engine, input_path, output_path
-        self.options = (target, source_name, beam_size, join, penalty)
-        self.cancel = False
-
-    def run(self):
-        target, source_name, beam_size, join, penalty = self.options
-        try:
-            done, total = self.engine.translate_file(
-                self.input_path, self.output_path, target, source_name, beam_size, join, penalty,
-                is_cancelled=lambda: self.cancel, on_progress=self.progress.emit,
-            )
-            self.finished_ok.emit(done, total)
-        except Exception as error:
-            self.failed.emit(str(error))
-
-
-class ModelDownloadWorker(QThread):
-    """Downloads the model that the app offers, in the background"""
-
-    progress = Signal(float, float)
-    finished_ok = Signal(object)  # the model folder, or None if cancelled
-    failed = Signal(str, str)
-
-    def __init__(self):
-        super().__init__()
-        self.cancel = False
-
-    def run(self):
-        try:
-            folder = download_model(is_cancelled=lambda: self.cancel, on_progress=self.progress.emit)
-            self.finished_ok.emit(folder)
-        except EngineError as error:
-            self.failed.emit(error.title, error.message)
-        except Exception as error:
-            self.failed.emit("Download failed", str(error))
-
-
-class DownloadDialog(QDialog):
-    """Shows the progress of the download of a model, which can be cancelled"""
-
-    def __init__(self, parent, worker):
-        super().__init__(parent)
-        self.setWindowTitle("Download a Model")
-        self.worker = worker
-        self.folder = None  # the model folder when it is downloaded
-        self.error = None  # title and message of a failure
-        self.label = QLabel("Downloading " + MODEL_DOWNLOAD["name"] + "...")
-        self.bar = QProgressBar()
-        self.bar.setRange(0, 0)  # until the download starts
-        self.detail = QLabel("")
-        self.cancel_button = QPushButton("Cancel")
-        self.cancel_button.clicked.connect(self.cancel)
-        layout = QVBoxLayout(self)
-        for widget in (self.label, self.bar, self.detail, self.cancel_button):
-            layout.addWidget(widget)
-        self.setMinimumWidth(420)
-        worker.progress.connect(self.on_progress)
-        worker.finished_ok.connect(self.on_finished)
-        worker.failed.connect(self.on_failed)
-
-    def exec(self):
-        self.start_time = time.time()
-        self.worker.start()
-        return super().exec()
-
-    def cancel(self):
-        self.worker.cancel = True
-        self.cancel_button.setEnabled(False)
-        self.detail.setText("Cancelling...")
-
-    def on_progress(self, done, total):
-        self.bar.setRange(0, 1000)
-        self.bar.setValue(int(1000 * done / total))
-        detail = "%d of %d MB" % (done / 1048576, total / 1048576)
-        elapsed = time.time() - self.start_time
-        if elapsed > 3 and done:
-            detail += " (about " + format_duration(elapsed * (total - done) / done) + " left)"
-        self.detail.setText(detail)
-
-    def on_finished(self, folder):
-        self.folder = folder
-        self.worker.wait()
-        self.accept()
-
-    def on_failed(self, title, message):
-        self.error = (title, message)
-        self.worker.wait()
-        self.accept()
-
-    def reject(self):  # closing the window cancels the download
-        if self.worker.isRunning():
-            self.cancel()
-        else:
-            super().reject()
-
-
-class WelcomeDialog(QDialog):
-    """Offers a model at the first start, because the app cannot translate without one"""
-
-    def __init__(self, parent, downloaded):
-        super().__init__(parent)
-        self.setWindowTitle("Welcome to " + APP_NAME)
-        self.choice = ""  # download, open, or later
-        size = "%d MB" % (MODEL_DOWNLOAD["size"] / 1048576)
-        text = QLabel(
-            "<h3>Welcome to " + APP_NAME + "</h3>"
-            "<p>" + APP_NAME + " needs a translation model to work. The " + MODEL_DOWNLOAD["name"] + " model translates between 200 languages."
-            + ("" if downloaded else " It is a download of " + size + ".") + "</p>"
-            "<p>It is released under the <a href='https://creativecommons.org/licenses/by-nc/4.0/'>CC-BY-NC 4.0</a> license, "
-            "which does not allow commercial use. You can find other models in Help &gt; Get Models.</p>"
-        )
-        text.setWordWrap(True)
-        text.setOpenExternalLinks(True)
-        self.skip = QCheckBox("Do not show this again")
-        buttons = QDialogButtonBox()
-        use = buttons.addButton("Use " + MODEL_DOWNLOAD["name"] if downloaded else "Download " + MODEL_DOWNLOAD["name"], QDialogButtonBox.ButtonRole.AcceptRole)
-        other = buttons.addButton("Open a model I have...", QDialogButtonBox.ButtonRole.ActionRole)
-        later = buttons.addButton("Later", QDialogButtonBox.ButtonRole.RejectRole)
-        use.setDefault(True)
-        use.clicked.connect(lambda: self.finish("download"))
-        other.clicked.connect(lambda: self.finish("open"))
-        later.clicked.connect(lambda: self.finish("later"))
-        layout = QVBoxLayout(self)
-        for widget in (text, self.skip, buttons):
-            layout.addWidget(widget)
-        self.setMinimumWidth(460)
-
-    def finish(self, choice):
-        self.choice = choice
-        self.accept()
-
-    def reject(self):
-        self.choice = "later"
-        super().reject()
-
-
-class DocumentDialog(QDialog):
-    """Shows the progress of the translation of a file, which can be cancelled"""
-
-    def __init__(self, parent, worker, input_path):
-        super().__init__(parent)
-        self.setWindowTitle("Translate Document")
-        self.worker = worker
-        self.outcome = ""  # done, cancelled, or the error
-        self.label = QLabel("Translating " + os.path.basename(input_path) + "...")
-        self.bar = QProgressBar()
-        self.bar.setRange(0, 0)  # until the first part is translated
-        self.detail = QLabel("")
-        self.cancel_button = QPushButton("Cancel")
-        self.cancel_button.clicked.connect(self.cancel)
-        layout = QVBoxLayout(self)
-        for widget in (self.label, self.bar, self.detail, self.cancel_button):
-            layout.addWidget(widget)
-        self.setMinimumWidth(420)
-        worker.progress.connect(self.on_progress)
-        worker.finished_ok.connect(self.on_finished)
-        worker.failed.connect(self.on_failed)
-
-    def start(self):
-        self.start_time = time.time()
-        self.worker.start()
-
-    def exec(self):
-        self.start()
-        return super().exec()
-
-    def cancel(self):
-        self.worker.cancel = True
-        self.cancel_button.setEnabled(False)
-        self.detail.setText("Cancelling...")
-
-    def on_progress(self, done, total):
-        self.bar.setRange(0, total)
-        self.bar.setValue(min(done, total))
-        detail = str(int(100 * done / total)) + "%"
-        elapsed = time.time() - self.start_time
-        if elapsed > 3 and done:
-            detail += " (about " + format_duration(elapsed * (total - done) / done) + " left)"
-        self.detail.setText(detail)
-
-    def on_finished(self, done, total):
-        self.outcome = "done" if done >= total or not self.worker.cancel else "cancelled"
-        self.worker.wait()
-        self.accept()
-
-    def on_failed(self, message):
-        self.outcome = message
-        self.worker.wait()
-        self.accept()
-
-    def reject(self):  # closing the window cancels, and the translated part is kept
-        if self.worker.isRunning():
-            self.cancel()
-        else:
-            super().reject()
-
-
-class SourceEdit(QTextEdit):
-    """The source text; a text file can be dropped on it"""
-
-    file_dropped = Signal(str)
-
-    def canInsertFromMimeData(self, source):
-        return source.hasUrls() or super().canInsertFromMimeData(source)
-
-    def insertFromMimeData(self, source):
-        if source.hasUrls() and source.urls()[0].isLocalFile():
-            self.file_dropped.emit(source.urls()[0].toLocalFile())
-        else:
-            super().insertFromMimeData(source)
-
-
-class LanguageBox(QComboBox):
-    """A language list that can be searched by typing"""
-
-    def __init__(self):
-        super().__init__()
-        self.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-        self.setMinimumContentsLength(16)
-        self.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
-
-    def set_languages(self, items, searchable):
-        self.blockSignals(True)
-        self.clear()
-        self.addItems(items)
-        self.setEditable(searchable)
-        if searchable:
-            completer = QCompleter(items, self)
-            completer.setFilterMode(Qt.MatchFlag.MatchContains)
-            completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-            self.setCompleter(completer)
-        # The list is as wide as its longest name, even if the box is narrower
-        self.view().setMinimumWidth(self.view().sizeHintForColumn(0) + 40)
-        self.blockSignals(False)
-
-    def choose(self, text):
-        """Select an entry by its name; returns False if there is no such entry"""
-        index = self.findText(text, Qt.MatchFlag.MatchFixedString)
-        if index < 0:
-            return False
-        self.setCurrentIndex(index)
-        return True
-
-
-class PreferencesDialog(QDialog):
-    def __init__(self, parent, beam_size, join_lines, remember, repetition):
-        super().__init__(parent)
-        self.setWindowTitle("Preferences")
-        self.quality = QComboBox()
-        self.quality.addItems(QUALITY)
-        self.quality.setCurrentText(next((n for n, b in QUALITY.items() if b == beam_size), "Balanced"))
-        self.quality.setToolTip("Fast takes less time; Accurate searches more candidate translations (a larger beam size)")
-        self.repetition = QCheckBox("Avoid repeated words (a repetition penalty of 1.2; it scored lower in our tests)")
-        self.repetition.setChecked(repetition)
-        self.join_lines = QCheckBox("Join lines inside a paragraph (for text from PDF or OCR)")
-        self.join_lines.setChecked(join_lines)
-        self.remember = QCheckBox("Remember the last model and target language")
-        self.remember.setChecked(remember)
-        form = QFormLayout()
-        form.addRow("Translation quality:", self.quality)
-        form.addRow(self.repetition)
-        form.addRow(self.join_lines)
-        form.addRow(self.remember)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout = QVBoxLayout(self)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-
-    def values(self):
-        return QUALITY[self.quality.currentText()], self.join_lines.isChecked(), self.remember.isChecked(), self.repetition.isChecked()
 
 
 class Window(QMainWindow):
