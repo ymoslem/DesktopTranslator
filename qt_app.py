@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
 from engine import (
     AUTO_DETECT,
     DATA_DIR,
+    LID_CONFIDENCE,
     LONG_LINE_CHARS,
     MODEL_DOWNLOAD,
     REPETITION_PENALTY,
@@ -59,7 +60,7 @@ from gui.constants import (
 )
 from gui.dialogs import DocumentDialog, DownloadDialog, PreferencesDialog, WelcomeDialog
 from gui.helpers import short_text
-from gui.widgets import LanguageBox, SourceEdit
+from gui.widgets import InfoSign, LanguageBox, SourceEdit
 from gui.workers import DocumentWorker, ModelDownloadWorker, Worker
 from utils.paragraph_splitter import TextBuilder, paragraph_detokenizer
 
@@ -126,11 +127,16 @@ class Window(QMainWindow):
 
         header_height = self.copy_button.sizeHint().height()
 
-        def pane_with_header(header, pane, button=None):
+        def pane_with_header(header, pane, button=None, after_header=None):
             header.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             row = QHBoxLayout()
             row.setContentsMargins(0, 0, 0, 0)
-            row.addWidget(header, 1)
+            if after_header:  # a widget right after the text of the header
+                row.addWidget(header)
+                row.addWidget(after_header)
+                row.addStretch(1)
+            else:
+                row.addWidget(header, 1)
             if button:
                 row.addWidget(button)
             bar = QWidget()
@@ -146,7 +152,9 @@ class Window(QMainWindow):
             return holder
 
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
-        self.splitter.addWidget(pane_with_header(self.source_header, self.source_text))
+        self.detection_info = InfoSign("")  # shown when the detected language is a guess
+        self.detection_info.hide()
+        self.splitter.addWidget(pane_with_header(self.source_header, self.source_text, after_header=self.detection_info))
         self.target_header = QLabel("Translation")
         self.splitter.addWidget(pane_with_header(self.target_header, self.target_text, self.copy_button))
         self.splitter.setChildrenCollapsible(False)
@@ -312,16 +320,22 @@ class Window(QMainWindow):
         """Source header: the language, when it is detected, and the number of words"""
         text = self.source_text.toPlainText()
         words = len(text.split())
-        notes = []
+        notes, tip = [], ""
         if self.selected_source() == AUTO_DETECT and text.strip():
             code, prefix = self.engine.source_language(text[:2000])
             if code:
                 reverse = {v: k for k, v in self.engine.language_codes.items()}
                 self.detected_name = reverse.get(prefix, "")  # a name the language lists know, for swapping
-                notes.append("detected: " + (self.detected_name or code))
+                name = self.detected_name or code
+                notes.append("detected: " + name)
+                probability = self.engine.language_probability(text[:2000], code)
+                if probability < LID_CONFIDENCE:  # explain that the detection is a guess
+                    tip = "%s is a guess, %d%% sure. Select the source language to be sure." % (name, round(100 * probability))
         if words:
             notes.append(format(words, ",") + (" word" if words == 1 else " words"))
         self.source_header.setText("Source (" + ", ".join(notes) + ")" if notes else "Source")
+        self.detection_info.setToolTip(tip)
+        self.detection_info.setVisible(bool(tip))
 
     # Models
 

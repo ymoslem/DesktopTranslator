@@ -20,6 +20,7 @@ from utils.paragraph_splitter import paragraph_tokenizer, join_lines, TextBuilde
 from utils.settings import load_settings, save_settings, settings_path
 
 AUTO_DETECT = "Auto detect"
+LID_CONFIDENCE = 0.7  # below this probability, the detected language is shown as a guess (see tests/lid_eval.py)
 LONG_LINE_CHARS = 100000  # a text area takes minutes to display a single line much longer than this
 REPETITION_PENALTY = 1.2  # the optional penalty for repeated words; a penalty of 1.0 is the default, as it scored better
 WORD_LIMIT = 20000  # a longer text is translated as a document, from a file to a file
@@ -391,14 +392,22 @@ class Engine:
 
     # Languages
 
-    def detect_language(self, text):
-        """Languages of a text, the most likely first; none for text without letters"""
+    def detect_language_scores(self, text):
+        """The two most likely languages of a text with their probabilities, the most likely first; none for text without letters"""
         if self.lid_model is None:
             self.lid_model = fasttext.load_model(os.path.join(DATA_DIR, "utils", "lid.176.ftz"))
         text = text[:200].lower() if len(text) > 200 else text.lower()
         # model.predict() fails with NumPy 2, so use the underlying call
         prediction = self.lid_model.f.predict(text.replace("\n", " "), 2, 0.0, "strict")
-        return [label[9:] for _, label in prediction]
+        return [(label[9:], probability) for probability, label in prediction]
+
+    def detect_language(self, text):
+        """Languages of a text, the most likely first; none for text without letters"""
+        return [code for code, _ in self.detect_language_scores(text)]
+
+    def language_probability(self, text, code):
+        """The probability that the text is in the language with this code (fastText code); 0 if it is not among the best two"""
+        return dict(self.detect_language_scores(text)).get(code, 0.0)
 
     def source_language(self, text, selected=AUTO_DETECT):
         """Return the source language code and the prefix token the model needs

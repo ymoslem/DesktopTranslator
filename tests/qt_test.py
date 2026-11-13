@@ -584,6 +584,21 @@ ct2.get_cuda_device_count = no_cuda
 check(engine_module.gpu_count() == 0, "a missing CUDA driver means no GPU")
 ct2.Translator, ct2.get_cuda_device_count, ct2.get_supported_compute_types = real
 
+# Language detection says when it is unsure
+scores = engine_module.Engine().detect_language_scores("Hello, how are you today?")
+check(scores[0][0] == "en" and scores[0][1] > 0.9, "a sentence is detected with a high probability")
+lid_window = qt_app.Window()
+lid_window.load_model(NLLB)
+lid_window.show()
+lid_window.source_text.setPlainText("The weather is nice today, and we will go for a walk.")
+lid_window.update_header()
+check("detected: English," in lid_window.source_header.text() and not lid_window.detection_info.isVisible(), "a sure detection has no (i) sign")
+lid_window.source_text.setPlainText("test")
+lid_window.update_header()
+check(lid_window.source_header.text() == "Source (detected: Hungarian, 1 word)" and lid_window.detection_info.isVisible()
+      and "57% sure" in lid_window.detection_info.toolTip(), "an unsure detection of one word has an (i) sign with the confidence")
+lid_window.close()
+
 # The device in the Preferences
 count_boxes = lambda dialog: len(dialog.findChildren(QComboBox))
 check(count_boxes(qt_app.PreferencesDialog(window, 3, False, True, False)) == 1
