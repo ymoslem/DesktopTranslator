@@ -1,6 +1,31 @@
 # Changelog
 
 
+## v0.4.1
+
+### Added
+
+- Support for NVIDIA GPUs
+  - Edit > Preferences > Run on chooses the CPU or the GPU. It appears when a GPU is found
+  - A model on the GPU runs as float16, or as the first compute type that the GPU supports
+  - The status bar shows "(GPU)" after the name of a model that runs on the GPU
+  - If the GPU cannot load a model, for example because its memory is too small, the app explains why, and you can choose the CPU
+  - It is tested on an NVIDIA RTX 5090 with Linux, and not yet on Windows
+- At the first start, the app offers to download the NLLB-200 distilled 600M model, with progress and Cancel. The download is checked against a SHA-256 checksum
+- Edit > Preferences > Load the last model at start, on by default. A model that may not fit in memory is loaded when you translate
+- An (i) sign after each preference shows what it does
+- An (i) sign in the Source header when the detected language is a guess, with its probability. A single word was detected correctly about 60% of the time (`tests/lid_eval.py`)
+- Help > Report an Issue... opens the issues page
+
+### Changed
+
+- The Translate button follows the language lists
+- Translation quality is Fast (beam size 2), Balanced (3, the default) or Thorough (5). With NLLB-200 600M on FLORES-200 in four languages, beam size 1 scored lower than 3, and sizes 2 and 5 were comparable to 3 (`tests/beam_eval.py`)
+- About DesktopTranslator is in the application menu on macOS, and only the name is bold
+- The NLLB-200 600M and 1.3B models are linked from the `models` release
+- The interface code is split into the `gui` package
+
+
 ## v0.4.0
 
 ### Changed

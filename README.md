@@ -8,6 +8,7 @@ DesktopTranslator translates text and documents on your own computer. Nothing is
 * The translation appears as it is made, and you can cancel and keep what is done
 * Long files are translated in the background with <kbd>File</kbd> menu \> <kbd>Translate Document...</kbd>
 * Right-to-left languages such as Arabic are edited right to left, and the app follows the dark mode of your system
+* Models can run on an NVIDIA GPU, chosen in <kbd>Edit</kbd> menu \> <kbd>Preferences...</kbd>
 * Installers for Windows and macOS, or run it from source
 
 ![DesktopTranslator](img/DesktopTranslator.png)
@@ -40,6 +41,8 @@ The installers are not signed. On macOS (Apple Silicon), open **System Settings*
 
 ## Using DesktopTranslator
 
+At the first start, the app offers to download the NLLB-200 distilled 600M model (582 MB, [CC-BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)). You can also open a model you already have.
+
 1. Choose <kbd>Translate</kbd> menu \> <kbd>Open Model...</kbd> (<kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>M</kbd>) and select the folder of a [translation model](#translation-models). The SentencePiece model is found in the same folder; if there are several, you are asked which one to use.
 2. For a multilingual model, select the target language. The source language is detected, and the Source header shows it with the number of words. To choose the source language yourself, use the <kbd>From</kbd> list. The <kbd>⇄</kbd> button swaps the two languages.
 3. Type or paste text on the left, or open a file with <kbd>File</kbd> menu \> <kbd>Open Text...</kbd> (plain text files only; use <kbd>Reopen Text with Encoding...</kbd> if the characters look wrong). You can also drop a text file on the source pane.
@@ -52,9 +55,11 @@ Right-to-left languages such as Arabic, Persian, Urdu, and Hebrew are displayed 
 | Option | Effect |
 |---|---|
 | Translation quality | Fast (beam size 2), Balanced (3, the default), or Thorough (5, slower) |
+| Run on | The CPU, or an NVIDIA GPU when one is found. It is tested on an RTX 5090 with Linux. On Windows, CTranslate2 needs the CUDA 12 libraries, which we have not tested yet; please report what you see in an [issue](https://github.com/ymoslem/DesktopTranslator/issues) |
 | Avoid repeated words | A repetition penalty of 1.2, off by default because translations scored higher without it in tests (`tests/repetition_penalty_eval.py`) |
 | Join lines inside a paragraph | For text from PDF files or OCR, where lines break in the middle of a sentence |
 | Remember the last model and target language | Opens the same model the next time |
+| Load the last model at start | Loads the model when the app starts, so the first translation does not wait for it |
 
 **Long texts.** The text area accepts up to 20,000 words. For a longer text, use <kbd>File</kbd> menu \> <kbd>Translate Document...</kbd> (<kbd>Ctrl</kbd>/<kbd>Cmd</kbd> + <kbd>Shift</kbd> + <kbd>O</kbd>), which translates a plain text file into another file in the background, with progress and the time left. If you cancel, the translated part is saved. PDF and Word files are not supported; save them as plain text first.
 
