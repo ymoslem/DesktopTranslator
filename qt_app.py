@@ -113,13 +113,14 @@ class Window(QMainWindow):
 
         top = QHBoxLayout()
         top.addWidget(self.model_button)
-        top.addWidget(self.translate_button)
         top.addSpacing(16)
         top.addWidget(QLabel("From:"))
         top.addWidget(self.source_combo)
         top.addWidget(self.swap_button)
         top.addWidget(QLabel("To:"))
         top.addWidget(self.target_combo)
+        top.addSpacing(16)
+        top.addWidget(self.translate_button)
         top.addStretch()
 
         header_height = self.copy_button.sizeHint().height()
