@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import shutil
+import ssl
 import subprocess
 import sys
 import time
@@ -62,6 +63,22 @@ class EngineError(Exception):
         super().__init__(message)
         self.title = title
         self.message = message
+
+
+def ssl_context():
+    """A context that checks certificates against the system and against the bundle of certifi
+
+    A packaged app on macOS has no certificate bundle that Python can find, so a request fails with
+    "unable to get local issuer certificate" without certifi. The system certificates stay in, because on Windows
+    they hold the certificates that a company or an antivirus program may add."""
+    context = ssl.create_default_context()
+    try:
+        import certifi
+
+        context.load_verify_locations(cafile=certifi.where())
+    except Exception:
+        pass
+    return context
 
 
 def format_duration(seconds):
@@ -158,7 +175,7 @@ def download_model(info=MODEL_DOWNLOAD, is_cancelled=lambda: False, on_progress=
     extracted = os.path.join(target, info["folder"] + ".extracting")
     digest, done = hashlib.sha256(), 0
     try:
-        with urllib.request.urlopen(info["url"], timeout=30) as response, open(part, "wb") as archive:
+        with urllib.request.urlopen(info["url"], timeout=30, context=ssl_context()) as response, open(part, "wb") as archive:
             total = int(response.headers.get("Content-Length") or info["size"])
             while True:
                 if is_cancelled():

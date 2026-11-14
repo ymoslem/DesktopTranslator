@@ -838,6 +838,13 @@ class Window(QMainWindow):
 
 
 def main():
+    if "--check-update" in sys.argv:  # for testing a packaged app: the exit code is 0 when GitHub answers
+        try:
+            print(updates.fetch_latest())
+            sys.exit(0)
+        except Exception as error:
+            print(error)
+            sys.exit(1)
     app = QApplication(sys.argv)
     app.setApplicationName(APP_NAME)
     icon = os.path.join(DATA_DIR, "img", "icon.png")

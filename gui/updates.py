@@ -3,6 +3,7 @@ import json
 import re
 import urllib.request
 
+from engine import ssl_context
 from gui.constants import APP_NAME, RELEASES_URL, VERSION
 
 LATEST_URL = "https://api.github.com/repos/ymoslem/DesktopTranslator/releases/latest"
@@ -20,6 +21,6 @@ def is_newer(latest, current):
 def fetch_latest(timeout=10):
     """The tag and the page of the latest release; the request sends the name and version of the app, and the address of the computer"""
     request = urllib.request.Request(LATEST_URL, headers={"Accept": "application/vnd.github+json", "User-Agent": APP_NAME + "/" + VERSION})
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    with urllib.request.urlopen(request, timeout=timeout, context=ssl_context()) as response:
         data = json.load(response)
     return data["tag_name"], data.get("html_url") or RELEASES_URL

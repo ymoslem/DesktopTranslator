@@ -806,6 +806,20 @@ diag_window.close()
 import gui.updates
 
 check("Check for Updates..." in [a.text() for a in window.menuBar().actions()[-1].menu().actions()], "the Help menu has Check for Updates")
+import ssl
+import urllib.request
+
+context = engine_module.ssl_context()
+seen_contexts = []
+real_urlopen = urllib.request.urlopen
+urllib.request.urlopen = lambda *a, **k: seen_contexts.append(k.get("context")) or (_ for _ in ()).throw(OSError("stop"))
+try:
+    gui.updates.fetch_latest()
+except OSError:
+    pass
+urllib.request.urlopen = real_urlopen
+check(isinstance(context, ssl.SSLContext) and context.verify_mode == ssl.CERT_REQUIRED and context.cert_store_stats()["x509_ca"] > 0
+      and len(seen_contexts) == 1 and isinstance(seen_contexts[0], ssl.SSLContext), "web requests check certificates against the bundle of certifi")
 check(gui.updates.is_newer("v0.4.10", "0.4.9") and gui.updates.is_newer("v0.5.0", "0.4.9") and not gui.updates.is_newer("v0.4.2", "0.4.2")
       and not gui.updates.is_newer("v0.4.1", "0.4.2-dev"), "versions are compared by their numbers")
 latest = {"tag_name": "v9.9.9", "html_url": "https://example.org/releases/v9.9.9"}

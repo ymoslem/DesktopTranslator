@@ -75,6 +75,10 @@ jobs:
           print("${{ matrix.name }} Qt build: unpacked %.0f MB, zip %.0f MB" % (unpacked / 1e6, os.path.getsize(archive) / 1e6))
           PY
 
+      - name: Check that the app can reach GitHub
+        run: |
+          "${{ matrix.program }}" --check-update
+
       - name: Check the app icon
         run: |
           if [ "${{ matrix.name }}" = "macOS" ]; then
