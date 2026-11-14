@@ -1,6 +1,16 @@
 # Changelog
 
 
+## v0.4.2
+
+### Changed
+
+- Faster translation on an NVIDIA GPU. The app sends the GPU up to 128 sentences or 4,096 tokens in one call, where it sent 8 sentences. With NLLB-200 600M on an RTX 5090 this was about 4 times as fast, and chrF++ stayed within 0.04 of the earlier setting (`tests/gpu_batch_eval.py`, `tests/gpu_batch_quality.py`). The CPU is unchanged
+- If the GPU runs out of memory while it loads a model, the app loads it as int8_float16, which needs less memory. If it runs out while translating, the app uses smaller batches
+- The tooltips of Run on and of the model name in the status bar say how the model runs on the GPU
+- The README lists the models in the order that the app offers them, and says that the int8 files run on a GPU as float16
+
+
 ## v0.4.1
 
 ### Added
