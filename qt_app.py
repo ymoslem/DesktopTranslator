@@ -40,6 +40,7 @@ from engine import (
     Preferences,
     downloaded_model,
     find_sentencepiece,
+    cuda_libraries_found,
     gpu_count,
     format_duration,
     longest_line,
@@ -390,6 +391,10 @@ class Window(QMainWindow):
         finally:
             QApplication.restoreOverrideCursor()
         self.pending_model = ""
+        if self.engine.gpu_problem:  # the choice of the GPU could not be used, so the model runs on the CPU
+            problem, self.engine.gpu_problem = self.engine.gpu_problem, ""
+            self.preferences.set("device", "cpu")
+            self.show_error("The GPU cannot be used", problem + "\n\nThe model runs on the CPU.")
         if changed:
             self.set_languages(self.engine.model_type)
             self.restore_target()
@@ -609,7 +614,7 @@ class Window(QMainWindow):
         self.worker.batch_done.connect(self.on_batch)
         self.worker.done.connect(self.on_done)
         self.worker.cancelled.connect(lambda: self.finish("Translation cancelled. The translated part is kept."))
-        self.worker.failed.connect(lambda message: self.finish("Translation failed: " + message))
+        self.worker.failed.connect(self.on_translation_failed)
         self.progress_bar.setRange(0, self.total_words)
         self.progress_bar.setValue(0)
         self.progress_bar.show()
@@ -651,6 +656,21 @@ class Window(QMainWindow):
         if self.partial_text.rstrip() != self.translation:
             self.target_text.setPlainText(self.translation)
         self.finish("Translation completed in %.1f s." % (time.time() - self.start))
+
+    def on_translation_failed(self, message):
+        if self.engine.gpu_problem:  # the CUDA 12 libraries are missing, so the model moves to the CPU, with an explanation
+            self.finish("Translation failed: the GPU cannot be used.")
+            self.use_cpu_after_gpu_problem()
+        else:
+            self.finish("Translation failed: " + message)
+
+    def use_cpu_after_gpu_problem(self):
+        """The GPU cannot be used: choose the CPU, load the model on it, and say what to install"""
+        problem, self.engine.gpu_problem = self.engine.gpu_problem, ""
+        self.preferences.set("device", "cpu")
+        if self.engine.model_dir:
+            self.load_model(self.engine.model_dir)
+        self.show_error("The GPU cannot be used", problem + "\n\nThe model now runs on the CPU. Translate again.")
 
     def finish(self, message):
         self.worker.wait()
@@ -729,7 +749,7 @@ class Window(QMainWindow):
             self, self.preferences.get("beam_size", 3), self.preferences.get("join_lines", False),
             self.preferences.get("remember_model_paths", True), self.preferences.get("repetition_penalty", 1.0) > 1.0,
             self.preferences.get("device", "cpu"), gpu_count() > 0, self.preferences.get("load_at_start", True),
-            self.preferences.get("cpu_speed", "standard"),
+            self.preferences.get("cpu_speed", "standard"), gpu_count() == 0 or cuda_libraries_found(),
         )
         if dialog.exec():
             beam_size, join_lines, remember, repetition = dialog.values()

@@ -1,8 +1,11 @@
 """The part of DesktopTranslator without interface code: models, languages, and translation."""
 import codecs
+import ctypes
+import glob
 import hashlib
 import json
 import os
+import re
 import shutil
 import ssl
 import subprocess
@@ -305,6 +308,11 @@ def memory_warning(model_dir, info=None):
 
 
 CUDA_LIBRARY_NAMES = ("cublas", "cudnn", "cudart", "libcu", ".dll")  # a load error that mentions one of these means a missing CUDA library
+CUDA_LIBRARY = "cublas64_12.dll" if sys.platform == "win32" else "libcublas.so.12"  # the file of CUDA 12 that CTranslate2 needs first
+CUDA_ARCHIVE_URL = "https://developer.nvidia.com/cuda-toolkit-archive"
+CUDA_HINT = ("The GPU needs the NVIDIA CUDA 12 libraries (%s), and they were not found. CUDA 13 does not have them, "
+             "but it can stay installed next to CUDA 12. Install CUDA Toolkit 12.8 or 12.9 from %s, "
+             "and choose the GPU again in the Preferences." % (CUDA_LIBRARY, CUDA_ARCHIVE_URL))
 GPU_COMPUTE_TYPES = ("float16", "int8_float16", "float32")  # in order of preference; plain int8 was slow on GPUs
 
 
@@ -318,6 +326,56 @@ def gpu_count():
 
 def is_out_of_memory(error):
     return "out of memory" in str(error).lower()
+
+
+def cuda12_bin_dirs(environ=None, program_files=None):
+    """The folders of the installed CUDA 12 toolkits, the newest first, from the variables that the installer sets and the default folder"""
+    environ = os.environ if environ is None else environ
+    found = {}
+    for key, value in environ.items():
+        match = re.fullmatch(r"CUDA_PATH_V12_(\d+)", key.upper())
+        if match:
+            found[int(match.group(1))] = os.path.join(value, "bin")
+    root = os.path.join(program_files or environ.get("ProgramFiles", "C:\\Program Files"), "NVIDIA GPU Computing Toolkit", "CUDA")
+    for folder in glob.glob(os.path.join(root, "v12.*")):
+        minor = folder.rsplit("v12.", 1)[1]
+        if minor.isdigit():
+            found.setdefault(int(minor), os.path.join(folder, "bin"))
+    return [found[minor] for minor in sorted(found, reverse=True)]
+
+
+def prepare_cuda():
+    """On Windows, put the newest CUDA 12 folder in the search path of the libraries
+
+    CUDA_PATH points to the newest toolkit, such as 13, and CTranslate2 needs the files of 12 by name; this finds them
+    also when the folder of CUDA 12 is not in the PATH of the computer."""
+    if sys.platform != "win32":
+        return
+    for folder in cuda12_bin_dirs():
+        if os.path.isfile(os.path.join(folder, CUDA_LIBRARY)):
+            try:
+                os.add_dll_directory(folder)
+            except (OSError, AttributeError):
+                pass
+            if folder not in os.environ.get("PATH", "").split(os.pathsep):
+                os.environ["PATH"] = folder + os.pathsep + os.environ.get("PATH", "")
+            return
+
+
+def cuda_libraries_found():
+    """True if the CUDA 12 library that CTranslate2 needs for a GPU can be found"""
+    prepare_cuda()
+    if sys.platform == "win32":
+        return any(os.path.isfile(os.path.join(folder, CUDA_LIBRARY)) for folder in os.environ.get("PATH", "").split(os.pathsep) if folder)
+    try:
+        ctypes.CDLL(CUDA_LIBRARY)
+        return True
+    except OSError:
+        return False
+
+
+def is_missing_cuda_library(error):
+    return any(name in str(error).lower() for name in CUDA_LIBRARY_NAMES) and not is_out_of_memory(error)
 
 
 def gpu_compute_type():
@@ -383,6 +441,7 @@ class Engine:
         self.device = "cpu"  # "cuda" when the model runs on an NVIDIA GPU
         self.compute_type = ""  # the type a model on a GPU runs as; the CPU keeps the type of the files
         self.cpu_speed = "standard"  # the level of the sentences per call on the CPU, a key of CPU_SENTENCES
+        self.gpu_problem = ""  # the explanation when the GPU cannot be used because the CUDA 12 libraries are missing
         # Overrides of the limits of a call (see limits), for tests and for the memory of a GPU; None uses the defaults
         self.batch_sentences = self.call_tokens = self.max_batch_tokens = None
         self.sp_model = None
@@ -421,6 +480,9 @@ class Engine:
                 "Please make sure you select the direcotry of a valid CTranslate2 model!",
             )
         changed = self.inspect_model(model_dir)
+        self.gpu_problem = ""
+        if device == "cuda" and gpu_count() > 0 and not cuda_libraries_found():
+            self.gpu_problem, device = CUDA_HINT, "cpu"  # the model runs on the CPU, and the window explains why
         if device == "cuda" and gpu_count() > 0:
             types = gpu_compute_types()
             for compute_type in types:
@@ -431,8 +493,8 @@ class Engine:
                     if is_out_of_memory(error) and compute_type != types[-1]:
                         continue  # try the type that needs less memory
                     message = str(error)  # for example, not enough memory on the GPU
-                    if any(name in message.lower() for name in CUDA_LIBRARY_NAMES):
-                        message += "\n\nCTranslate2 needs the NVIDIA CUDA 12 libraries to use a GPU. Install CUDA 12.x from developer.nvidia.com/cuda-downloads."
+                    if is_missing_cuda_library(error):
+                        message += "\n\n" + CUDA_HINT
                     raise EngineError("The GPU could not load the model", message + "\n\nYou can choose the CPU in the Preferences.")
             self.device, self.compute_type = "cuda", compute_type
         else:
@@ -564,6 +626,9 @@ class Engine:
                 )
                 break
             except RuntimeError as error:
+                if is_missing_cuda_library(error):  # the libraries of the GPU are needed at the first translation, not when the model loads
+                    self.gpu_problem = CUDA_HINT
+                    raise EngineError("The GPU cannot be used", CUDA_HINT + "\n\nThe message of the library was: " + str(error))
                 if not is_out_of_memory(error) or max_batch <= MIN_BATCH_TOKENS:
                     raise
                 max_batch //= 2  # the GPU ran out of memory, so try smaller batches, and keep them for the next calls

@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from engine import MODEL_DOWNLOAD, format_duration
+from engine import CUDA_HINT, MODEL_DOWNLOAD, format_duration
 from gui.constants import APP_NAME, CPU_SPEEDS, DEFAULT_QUALITY, DEVICES, QUALITY
 from gui.widgets import InfoSign
 
@@ -198,13 +198,15 @@ def with_info(widget, text):
 
 
 class PreferencesDialog(QDialog):
-    def __init__(self, parent, beam_size, join_lines, remember, repetition, device="cpu", gpu=False, load_at_start=True, cpu_speed="standard"):
+    def __init__(self, parent, beam_size, join_lines, remember, repetition, device="cpu", gpu=False, load_at_start=True, cpu_speed="standard", gpu_ready=True):
         super().__init__(parent)
         self.setWindowTitle("Preferences")
         self.gpu = gpu  # an NVIDIA GPU is available, so the device can be chosen
+        self.gpu_ready = gpu_ready  # and the CUDA 12 libraries that it needs are installed
         self.device_box = QComboBox()
         self.device_box.addItems(DEVICES)
-        self.device_box.setCurrentText(DEVICES[1] if device == "cuda" and gpu else DEVICES[0])
+        self.device_box.setCurrentText(DEVICES[1] if device == "cuda" and gpu and gpu_ready else DEVICES[0])
+        self.device_box.setEnabled(gpu_ready)
         self.speed_box = QComboBox()
         self.speed_box.addItems(CPU_SPEEDS)
         self.speed_box.setCurrentText(next((name for name, key in CPU_SPEEDS.items() if key == cpu_speed), "Standard"))
@@ -233,7 +235,8 @@ class PreferencesDialog(QDialog):
         if gpu:
             form.addRow("Run on:", with_info(
                 self.device_box, "GPU can be faster than the CPU, if its memory is large enough for the model. "
-                "The model runs as float16 on the GPU, or as int8_float16 if float16 does not fit."))
+                "The model runs as float16 on the GPU, or as int8_float16 if float16 does not fit."
+                if gpu_ready else "An NVIDIA GPU was found, but it cannot be used yet. " + CUDA_HINT))
         form.addRow(with_info(self.repetition, "Applies a repetition penalty of 1.2. It scored lower in our tests."))
         form.addRow(with_info(self.join_lines, "For text from PDF or OCR, where lines break inside a paragraph."))
         form.addRow(with_info(self.remember, "Opens the last model again at the next start, and selects its last target language."))
@@ -248,7 +251,7 @@ class PreferencesDialog(QDialog):
 
     def device(self):
         """The device to use, cuda or cpu"""
-        return "cuda" if self.gpu and self.device_box.currentText() == DEVICES[1] else "cpu"
+        return "cuda" if self.gpu and self.gpu_ready and self.device_box.currentText() == DEVICES[1] else "cpu"
 
     def cpu_speed(self):
         """The level of the speed on the CPU, a key of engine.CPU_SENTENCES"""

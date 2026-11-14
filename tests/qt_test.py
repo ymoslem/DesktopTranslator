@@ -541,6 +541,8 @@ fresh.close()
 # GPU selection, with CTranslate2 replaced, because the test machine may have no NVIDIA GPU
 ct2 = engine_module.ctranslate2
 real = (ct2.Translator, ct2.get_cuda_device_count, ct2.get_supported_compute_types)
+real_cuda_found = engine_module.cuda_libraries_found
+engine_module.cuda_libraries_found = lambda: True  # the CUDA libraries are not on every test machine
 calls, gpu_full = [], []
 
 
@@ -599,8 +601,8 @@ try:
 except engine_module.EngineError as error:
     raised = error
 ct2.Translator = missing
-check(raised is not None and "cublas64_12.dll" in raised.message and "CUDA 12.x" in raised.message and "Preferences" in raised.message,
-      "a missing CUDA library is named, with what to install")
+check(raised is not None and "cublas64_12.dll" in raised.message and "CUDA Toolkit 12.8 or 12.9" in raised.message and "cuda-toolkit-archive" in raised.message
+      and "CUDA 13" in raised.message and "Preferences" in raised.message, "a missing CUDA library is named, with what to install, and that CUDA 13 does not have it")
 
 # A model that does not fit on the GPU as float16 is loaded as int8_float16
 
@@ -762,6 +764,64 @@ def no_cuda():
 ct2.get_cuda_device_count = no_cuda
 check(engine_module.gpu_count() == 0, "a missing CUDA driver means no GPU")
 ct2.Translator, ct2.get_cuda_device_count, ct2.get_supported_compute_types = real
+engine_module.cuda_libraries_found = real_cuda_found
+
+# The CUDA 12 libraries: the folders are found, and a missing library moves the model to the CPU
+with tempfile.TemporaryDirectory() as toolkit_root:
+    for minor in (8, 9):
+        bin_dir = os.path.join(toolkit_root, "NVIDIA GPU Computing Toolkit", "CUDA", "v12.%d" % minor, "bin")
+        os.makedirs(bin_dir)
+        open(os.path.join(bin_dir, "cublas64_12.dll"), "w").close()
+    os.makedirs(os.path.join(toolkit_root, "NVIDIA GPU Computing Toolkit", "CUDA", "v13.3", "bin"))
+    folders = engine_module.cuda12_bin_dirs({}, toolkit_root)
+    check([os.path.basename(os.path.dirname(f)) for f in folders] == ["v12.9", "v12.8"], "the CUDA 12 folders are found, the newest first, and CUDA 13 is left out")
+    by_variable = engine_module.cuda12_bin_dirs({"CUDA_PATH_V12_10": "X:/cuda"}, toolkit_root)
+    check(by_variable[0].startswith("X:/cuda") and len(by_variable) == 3, "a variable of the installer is used, and 12.10 is newer than 12.9")
+if sys.platform != "win32":
+    real_cdll = engine_module.ctypes.CDLL
+    engine_module.ctypes.CDLL = lambda name: (_ for _ in ()).throw(OSError("not found"))
+    missing = not engine_module.cuda_libraries_found()
+    engine_module.ctypes.CDLL = lambda name: object()
+    present = engine_module.cuda_libraries_found()
+    engine_module.ctypes.CDLL = real_cdll
+    check(missing and present, "the CUDA 12 library is found when it can be loaded, and missing when it cannot")
+ct2.get_cuda_device_count, ct2.get_supported_compute_types = (lambda: 1), (lambda name: {"float16"})
+engine_module.cuda_libraries_found = lambda: False
+fallback = engine_module.Engine()
+fallback.load_model(NLLB, "cuda")
+check(fallback.device == "cpu" and fallback.translator is not None and "cuda-toolkit-archive" in fallback.gpu_problem,
+      "a GPU without the CUDA 12 libraries runs the model on the CPU, with an explanation")
+
+
+class NoCublas:
+    def translate_batch(self, **kwargs):
+        raise RuntimeError("Library cublas64_12.dll is not found or cannot be loaded")
+
+
+late = engine_module.Engine()
+late.load_model(NLLB)
+late.load_sp_model(os.path.join(NLLB, "sentencepiece.model"))
+late.translator = NoCublas()
+try:
+    late.translate_batch(["Hello."], 3, "fra_Latn", "eng_Latn")
+    raised = None
+except engine_module.EngineError as error:
+    raised = error
+check(raised is not None and "cuda-toolkit-archive" in raised.message and "cublas64_12.dll" in raised.message and late.gpu_problem,
+      "a missing CUDA library at the first translation is explained")
+engine_module.cuda_libraries_found = real_cuda_found
+ct2.get_cuda_device_count, ct2.get_supported_compute_types = real[1], real[2]
+problem_window = qt_app.Window()
+problem_window.load_model(NLLB)
+problem_window.preferences.set("device", "cuda")
+problem_window.engine.gpu_problem = engine_module.CUDA_HINT
+messages.clear()
+problem_window.use_cpu_after_gpu_problem()
+check(problem_window.preferences.get("device", "cpu") == "cpu" and problem_window.engine.device == "cpu" and not problem_window.engine.gpu_problem
+      and messages and messages[-1][0] == "The GPU cannot be used" and "runs on the CPU" in messages[-1][1], "the window moves to the CPU after a GPU problem, and says so")
+problem_window.close()
+not_ready = qt_app.PreferencesDialog(window, 3, False, True, False, "cuda", True, gpu_ready=False)
+check(not not_ready.device_box.isEnabled() and not_ready.device() == "cpu", "the Preferences offer no GPU until the CUDA 12 libraries are found")
 
 # Language detection says when it is unsure
 scores = engine_module.Engine().detect_language_scores("Hello, how are you today?")
@@ -897,6 +957,7 @@ check(with_gpu.device() == "cpu" and with_gpu.values()[0] == 3, "the device can 
 gpu_full.clear()
 ct2.get_cuda_device_count = lambda: 1
 ct2.get_supported_compute_types = lambda name: {"float16", "float32"}
+engine_module.cuda_libraries_found = lambda: True
 device_window = qt_app.Window()
 device_window.load_model(NLLB)
 real_translator = device_window.engine.translator
@@ -912,6 +973,7 @@ device_window.change_device("cuda")
 check(messages and "out of memory" in messages[-1][1] and device_window.preferences.get("device", "cpu") == "cpu"
       and device_window.engine.device == "cpu", "a model that does not fit on the GPU is explained, and the CPU stays")
 ct2.Translator, ct2.get_cuda_device_count, ct2.get_supported_compute_types = real
+engine_module.cuda_libraries_found = real_cuda_found
 device_window.close()
 
 print("\n%d failure(s)" % len(failures))
