@@ -1,0 +1,20 @@
+name: Report a problem
+description: Something does not work as expected
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you do, and what did you see?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostic info
+      description: In the app, choose Help > Copy Diagnostic Info..., check the text, copy it, and paste it here. It has versions, hardware, settings, the name of the model folder, and the last error. It has no text, file names, or paths.
+      render: markdown
