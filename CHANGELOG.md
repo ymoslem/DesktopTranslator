@@ -1,6 +1,20 @@
 # Changelog
 
 
+## v0.4.3
+
+### Added
+
+- Set the number of sentences per batch on the CPU in Edit > Preferences > Speed on the CPU: Standard (8), Faster (16), Fastest (32), or Automatic. In our tests, Fastest was about 1.2 to 1.5 times as fast as Standard on the CPU of five machines (`tests/cpu_threads_eval.py`). Automatic makes each batch as large as the speed of the computer allows in about 5 seconds, so the same text can be translated a little differently from one run to another. Standard is the default and works as before
+- Copy the information that a report of an issue needs with Help > Copy Diagnostic Info.... It shows the versions, the hardware, the settings, the name of the model folder, and the last error, and it does not include your text, file names, or paths
+- Check whether a newer version is available with Help > Check for Updates..., which asks GitHub only when you choose it
+- Report a problem or suggest a feature with the new forms on GitHub. The form for a problem asks for the diagnostic info
+
+### Changed
+
+- A batch on the CPU also ends at 40 tokens per sentence of its limit, so a text with long sentences is translated in smaller batches
+
+
 ## v0.4.2
 
 ### Changed

@@ -5,7 +5,7 @@ cff-version: 1.2.0
 title: DesktopTranslator
 message: 'If you use this app, please cite this'
 type: software
-version: 0.4.2
+version: 0.4.3
 date-released: '2026-11-14'
 authors:
   - given-names: Yasmin
