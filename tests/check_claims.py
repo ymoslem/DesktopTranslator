@@ -9,7 +9,8 @@ if a claim and the results disagree. The claims are
   - beam sizes 2 and 5 are comparable to beam size 3 (CHANGELOG, tooltip of Translation quality)
   - a larger beam size takes longer (tooltip of Translation quality, README)
   - a model on a GPU runs as float16, tested on an NVIDIA RTX 5090 with Linux (CHANGELOG, README)
-  - on a GPU, 128 sentences per call with 4,096 tokens run about 4 times as fast as the CPU settings (engine.py, CHANGELOG)
+  - on a GPU, the limits of 128 sentences or 4,096 tokens run about 4 times as fast as batches of 8 sentences; the test text has 96 sentences, so it
+    is sent as one batch (engine.py, CHANGELOG)
   - on one machine, with 8 sentences per batch, the GPU is about 7 times as fast as a CPU with 16 threads and about 15 times as fast as one with 4 threads
   - with those settings, chrF++ is within 0.05 of the CPU settings and the difference is comparable (engine.py)
   - the int8 files run as float16 are comparable to a model converted straight to float16 (README)
@@ -80,19 +81,19 @@ def main():
     speed = {(r["sentences_per_call"], r["token_limit"]): r["words_per_second"] for r in sweep["rows"]}
     ratio = speed[(128, 4096)] / speed[(8, 1024)]
     check(round(ratio) == 4 and sweep["default"] == {"sentences_per_call": 8, "token_limit": 1024},
-          "128 sentences with 4,096 tokens run %.2f times as fast as 8 sentences with 1,024" % ratio)
+          "the test text (96 sentences) as one batch ran %.2f times as fast as batches of 8 sentences, GPU limits against CPU limits" % ratio)
     alternating = load("gpu_batch_ab_rtx5090_linux.json")
     check(round(alternating["ratio"]) == 4 and len(alternating["words_per_second"]["gpu settings"]) == alternating["rounds"] == 5
           and min(alternating["words_per_second"]["gpu settings"]) > max(alternating["words_per_second"]["cpu settings"]),
-          "alternating rounds on one pod: %.2f times as fast, and every run of the GPU settings beats every run of the CPU settings" % alternating["ratio"])
+          "alternating rounds on one pod, one batch of 96 sentences against batches of 8: %.2f times as fast, and every run is faster" % alternating["ratio"])
     for cores, expected in ((32, 7), (8, 15)):
         same = load("gpu_cpu_same_machine_rtxpro4500_linux_%dcores.json" % cores)
         runs, ratios = same["words_per_second"], same["ratios"]
         check(same["machine"]["cores_assumed"] == cores and same["devices"] == {"cpu": "cpu", "gpu": "cuda"}, "%d cores: the CPU and the GPU of one machine" % cores)
         check(round(ratios["gpu 8 over cpu 8"]) == expected and min(runs["gpu, 8 sentences"]) > max(runs["cpu, 8 sentences"]),
-              "%d cores, 8 sentences per batch: the GPU is %.1f times as fast as the CPU, in every run" % (cores, ratios["gpu 8 over cpu 8"]))
+              "%d cores, batches of 8 sentences: the GPU is %.1f times as fast as the CPU, in every run" % (cores, ratios["gpu 8 over cpu 8"]))
         check(round(ratios["gpu 128 over gpu 8"]) == 4 and min(runs["gpu, 128 sentences"]) > max(runs["gpu, 8 sentences"]),
-              "%d cores: on the GPU, 128 sentences per batch are %.1f times as fast as 8" % (cores, ratios["gpu 128 over gpu 8"]))
+              "%d cores: on the GPU, one batch of 96 sentences is %.1f times as fast as batches of 8" % (cores, ratios["gpu 128 over gpu 8"]))
         check(same["paragraph_seconds"]["gpu"]["median"] < same["paragraph_seconds"]["cpu"]["median"],
               "%d cores: a paragraph of %d words takes %.2f s on the GPU and %.2f s on the CPU" % (
                   cores, same["paragraph_words"], same["paragraph_seconds"]["gpu"]["median"], same["paragraph_seconds"]["cpu"]["median"]))
