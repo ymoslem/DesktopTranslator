@@ -12,7 +12,7 @@
 
 ### Changed
 
-- A batch on the CPU also ends at 40 tokens per sentence of its limit, so a text with long sentences is translated in smaller batches
+- On the CPU, a batch holds fewer sentences when the sentences are long, so Cancel and the progress bar stay quick. Sentences are not split
 
 
 ## v0.4.2
