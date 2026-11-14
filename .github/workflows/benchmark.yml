@@ -1,0 +1,56 @@
+name: Benchmark the CPU batch size
+
+on:
+  workflow_dispatch:
+    inputs:
+      words:
+        description: "Words of the text to translate"
+        default: "1000"
+      rounds:
+        description: "Rounds of alternating settings"
+        default: "3"
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Download the model and the text
+        run: |
+          curl -sL -o model.zip https://github.com/ymoslem/DesktopTranslator/releases/download/models/NLLB-200_distilled_600M_int8_ct2.zip
+          curl -sL -o flores.tgz https://dl.fbaipublicfiles.com/nllb/flores200_dataset.tar.gz
+          python - <<'EOF'
+          import tarfile, zipfile
+          zipfile.ZipFile("model.zip").extractall("models")
+          with tarfile.open("flores.tgz") as archive:
+              archive.extract("./flores200_dataset/devtest/eng_Latn.devtest", "flores")
+          EOF
+
+      - name: Compare the batch sizes
+        env:
+          CPU_BATCH_WORDS: ${{ inputs.words }}
+          CPU_BATCH_ROUNDS: ${{ inputs.rounds }}
+        run: python tests/cpu_batch_eval.py flores models/nllb-200-distilled-600M-int8 cpu_batch_${{ matrix.os }}.json
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: cpu-batch-${{ matrix.os }}
+          path: cpu_batch_*.json
