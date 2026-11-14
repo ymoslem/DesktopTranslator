@@ -9,6 +9,7 @@ Numbers behind the claims in the README, the CHANGELOG, and the tooltips of the 
 | `cometenv_freeze.txt` | `pip freeze` | The versions of the libraries used for COMET |
 | `gpu_check_rtx5090_linux.json` | `tests/gpu_check.py` | English to French on an NVIDIA RTX 5090 with Linux, for each compute type |
 | `gpu_batch_rtx5090_linux.json` | `tests/gpu_batch_eval.py` | Words per second, time per call and GPU memory of NLLB-200 600M on the RTX 5090 for 4 to 256 sentences per call and three token limits, on a text of 2,029 words |
+| `gpu_batch_ab_rtx5090_linux.json` | `tests/gpu_batch_ab.py` | Words per second of the settings of the CPU (8 sentences per call) and of the GPU (128 sentences or 4,096 tokens) in 5 alternating rounds on one pod, and the ratio of the medians |
 | `gpu_batch_quality_rtx5090_linux.json` | `tests/gpu_batch_quality.py` | chrF++ of 600 sentences into French and Arabic with larger batches, the number of sentences that change, and the paired bootstrap against the setting of the CPU |
 | `gpu_weights_rtx5090_linux.json` | `tests/gpu_weights_eval.py` | chrF++ of the int8 files run as float16, against a model converted straight to float16, on the same 600 sentences |
 | `lid_confidence.json` | `tests/lid_eval.py` | Accuracy of the language detection for texts of 1 to 10 words and for whole sentences, with the share of texts above probability thresholds |

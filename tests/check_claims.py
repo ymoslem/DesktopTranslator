@@ -9,7 +9,7 @@ if a claim and the results disagree. The claims are
   - beam sizes 2 and 5 are comparable to beam size 3 (CHANGELOG, tooltip of Translation quality)
   - a larger beam size takes longer (tooltip of Translation quality, README)
   - a model on a GPU runs as float16, tested on an NVIDIA RTX 5090 with Linux (CHANGELOG, README)
-  - on a GPU, 128 sentences per call with 4,096 tokens run about 4 times as fast as the CPU settings (engine.py)
+  - on a GPU, 128 sentences per call with 4,096 tokens run about 4 times as fast as the CPU settings (engine.py, CHANGELOG)
   - with those settings, chrF++ is within 0.05 of the CPU settings and the difference is comparable (engine.py)
   - the int8 files run as float16 are comparable to a model converted straight to float16 (README)
 """
@@ -80,6 +80,10 @@ def main():
     ratio = speed[(128, 4096)] / speed[(8, 1024)]
     check(round(ratio) == 4 and sweep["default"] == {"sentences_per_call": 8, "token_limit": 1024},
           "128 sentences with 4,096 tokens run %.2f times as fast as 8 sentences with 1,024" % ratio)
+    alternating = load("gpu_batch_ab_rtx5090_linux.json")
+    check(round(alternating["ratio"]) == 4 and len(alternating["words_per_second"]["gpu settings"]) == alternating["rounds"] == 5
+          and min(alternating["words_per_second"]["gpu settings"]) > max(alternating["words_per_second"]["cpu settings"]),
+          "alternating rounds on one pod: %.2f times as fast, and every run of the GPU settings beats every run of the CPU settings" % alternating["ratio"])
     quality = load("gpu_batch_quality_rtx5090_linux.json")
     for name, pairs in quality["rows"].items():
         for pair in ("128,4096",):

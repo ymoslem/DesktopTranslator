@@ -1,0 +1,47 @@
+{
+ "machine": {
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "processor": "x86_64",
+  "cores": 120,
+  "python": "3.12.3",
+  "ctranslate2": "4.8.4"
+ },
+ "device_used": "cuda",
+ "compute_type": "float16",
+ "words": 2029,
+ "rounds": 5,
+ "settings": {
+  "cpu settings": {
+   "batch_sentences": 8,
+   "call_tokens": 0,
+   "max_batch_tokens": 1024
+  },
+  "gpu settings": {
+   "batch_sentences": 128,
+   "call_tokens": 4096,
+   "max_batch_tokens": 4096
+  }
+ },
+ "words_per_second": {
+  "cpu settings": [
+   649.6748055723775,
+   653.2148950169485,
+   603.7799530214949,
+   649.6163501489614,
+   639.891178537947
+  ],
+  "gpu settings": [
+   2830.893327147939,
+   2747.4313506128005,
+   2818.319651652611,
+   2923.893609038262,
+   2776.5052290915564
+  ]
+ },
+ "same_translation": false,
+ "median_words_per_second": {
+  "cpu settings": 649.6163501489614,
+  "gpu settings": 2818.319651652611
+ },
+ "ratio": 4.338437065209876
+}
