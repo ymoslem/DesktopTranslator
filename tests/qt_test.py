@@ -602,6 +602,89 @@ ct2.Translator = missing
 check(raised is not None and "cublas64_12.dll" in raised.message and "CUDA 12.x" in raised.message and "Preferences" in raised.message,
       "a missing CUDA library is named, with what to install")
 
+# A model that does not fit on the GPU as float16 is loaded as int8_float16
+
+
+def fits_only_in_8_bits(model_dir, **kwargs):
+    calls.append(kwargs)
+    if kwargs.get("device") == "cuda" and kwargs.get("compute_type") == "float16":
+        raise RuntimeError("CUDA failed with error out of memory")
+    return object()
+
+
+ct2.Translator = fits_only_in_8_bits
+ct2.get_supported_compute_types = lambda name: {"float16", "int8_float16", "float32"}
+calls.clear()
+small = engine_module.Engine()
+small.load_model(NLLB, "cuda")
+check(small.device == "cuda" and small.compute_type == "int8_float16" and [c["compute_type"] for c in calls] == ["float16", "int8_float16"],
+      "a model that is too large as float16 is loaded as int8_float16")
+ct2.Translator = fake_translator
+gpu_full.append(True)
+try:
+    engine_module.Engine().load_model(NLLB, "cuda")
+    raised = None
+except engine_module.EngineError as error:
+    raised = error
+gpu_full.clear()
+check(raised is not None and "out of memory" in raised.message, "a model that does not fit in either type is explained")
+
+# The limits of a call: 8 sentences on the CPU, and 128 sentences or 4,096 tokens on a GPU
+cpu_engine = engine_module.Engine()
+cpu_engine.load_model(NLLB)
+cpu_engine.load_sp_model(os.path.join(NLLB, "sentencepiece.model"))
+text = "\n".join("This is sentence number %d of the test." % i for i in range(300))
+sizes = lambda batches: [len(b) for b in batches]
+check(set(sizes(cpu_engine.split(text, "en")[2])[:-1]) == {8}, "the CPU translates 8 sentences per call")
+cpu_engine.device = "cuda"
+check(sizes(cpu_engine.split(text, "en")[2]) == [128, 128, 44], "a GPU translates 128 sentences per call")
+cpu_engine.call_tokens = 100
+tokens_of = lambda batch: sum(len(t) + 2 for t in cpu_engine.sp_model.encode(batch, out_type=str))
+batches = cpu_engine.split(text, "en")[2]
+check(len(batches) > 3 and all(tokens_of(b) <= 100 or len(b) == 1 for b in batches) and [s for b in batches for s in b] == text.split("\n"),
+      "a call ends at the limit of tokens, and no sentence is lost or reordered")
+cpu_engine.call_tokens = 5
+check(all(len(b) == 1 for b in cpu_engine.split(text, "en")[2]), "a sentence over the limit of tokens is a call of its own")
+cpu_engine.device = "cpu"
+
+# When the memory of the GPU runs out during a translation, the batches become smaller
+
+
+class FakeResult:
+    hypotheses = [["\u2581fra_Latn", "\u2581ok"]]
+
+
+class TightGpu:
+    def __init__(self):
+        self.limits = []
+
+    def translate_batch(self, **kwargs):
+        self.limits.append(kwargs["max_batch_size"])
+        if kwargs["max_batch_size"] > 1024:
+            raise RuntimeError("CUDA failed with error out of memory")
+        return [FakeResult() for _ in kwargs["source"]]
+
+
+tight = TightGpu()
+cpu_engine.translator, cpu_engine.device = tight, "cuda"
+output = cpu_engine.translate_batch(["Hello."], 3, "fra_Latn", "eng_Latn")
+check(tight.limits == [4096, 2048, 1024] and cpu_engine.limits()[2] == 1024 and len(output) == 1,
+      "when the GPU runs out of memory, the batch limit is halved until the call works, and kept")
+
+
+class FullGpu:
+    def translate_batch(self, **kwargs):
+        raise RuntimeError("CUDA failed with error out of memory")
+
+
+cpu_engine.translator, cpu_engine.max_batch_tokens = FullGpu(), None
+try:
+    cpu_engine.translate_batch(["Hello."], 3, "fra_Latn", "eng_Latn")
+    raised = None
+except RuntimeError as error:
+    raised = error
+check(raised is not None and "out of memory" in str(raised), "a GPU that stays out of memory at the smallest batch fails with its message")
+
 
 def no_cuda():
     raise RuntimeError("CUDA driver not found")

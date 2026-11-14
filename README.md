@@ -89,7 +89,7 @@ DesktopTranslator supports CTranslate2 models with their SentencePiece subwordin
 
 ### NLLB-200 Multilingual Model
 
-DesktopTranslator supports [**NLLB-200**](https://arxiv.org/abs/2207.04672) ([NLLB Team et al., 2022](https://arxiv.org/abs/2207.04672)), a multilingual model that can translate between 200 languages. Note that Meta released the NLLB-200 models under the [CC-BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) license, which does not allow commercial use. To use them, please follow these steps:
+DesktopTranslator supports [**NLLB-200**](https://arxiv.org/abs/2207.04672) ([NLLB Team et al., 2022](https://arxiv.org/abs/2207.04672)), a multilingual model that can translate between 200 languages. Note that Meta released the NLLB-200 models under the [CC-BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/) license, which does not allow commercial use. The int8 files run on the CPU, and on an NVIDIA GPU, where the app runs them as float16. To use them, please follow these steps:
 1. Download one of the NLLB-200 models, converted to the CTranslate2 format with int8 quantization:  
     a. [NLLB-200 distilled 600M-parameter model](https://github.com/ymoslem/DesktopTranslator/releases/download/models/NLLB-200_distilled_600M_int8_ct2.zip); the smallest and fastest, and good for most uses. You can also use the <kbd>Help</kbd> menu \> <kbd>Get Models...</kbd>; or  
     b. [NLLB-200 distilled 1.3B-parameter model](https://github.com/ymoslem/DesktopTranslator/releases/download/models/NLLB-200_distilled_1.3B_int8_ct2.zip); slower and needs more memory, but sometimes more accurate; or  

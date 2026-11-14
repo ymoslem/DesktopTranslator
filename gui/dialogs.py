@@ -220,7 +220,8 @@ class PreferencesDialog(QDialog):
                           "In our tests, beam size 1 was clearly worse than 3, and beam size 5 was not clearly better."))
         if gpu:
             form.addRow("Run on:", with_info(
-                self.device_box, "GPU can be faster than the CPU, if its memory is large enough for the model."))
+                self.device_box, "GPU can be faster than the CPU, if its memory is large enough for the model. "
+                "The model runs as float16 on the GPU, or as int8_float16 if float16 does not fit."))
         form.addRow(with_info(self.repetition, "Applies a repetition penalty of 1.2. It scored lower in our tests."))
         form.addRow(with_info(self.join_lines, "For text from PDF or OCR, where lines break inside a paragraph."))
         form.addRow(with_info(self.remember, "Opens the last model again at the next start, and selects its last target language."))

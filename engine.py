@@ -25,6 +25,12 @@ LONG_LINE_CHARS = 100000  # a text area takes minutes to display a single line m
 REPETITION_PENALTY = 1.2  # the optional penalty for repeated words; a penalty of 1.0 is the default, as it scored better
 WORD_LIMIT = 20000  # a longer text is translated as a document, from a file to a file
 BATCH_SENTENCES = 8  # sentences translated in one call, so that progress and cancelling stay quick
+MAX_BATCH_TOKENS = 1024  # CTranslate2 splits a call into batches of at most this many tokens
+# On a GPU, larger calls are faster: about 4 times the speed of the CPU settings with NLLB-200 600M on an RTX 5090, with chrF++ within 0.05
+# (see tests/gpu_batch_eval.py and tests/gpu_batch_quality.py). A call ends at the first of the two limits, counted in tokens of the source.
+GPU_BATCH_SENTENCES = 128
+GPU_BATCH_TOKENS = 4096
+MIN_BATCH_TOKENS = 128  # the smallest limit after the memory of the GPU runs out
 DOCUMENT_LINES = 200  # lines of a document that are split and translated together
 
 # The model that the app offers to download when there is none; the checksum is the SHA-256 of the archive
@@ -284,6 +290,10 @@ def gpu_count():
         return 0
 
 
+def is_out_of_memory(error):
+    return "out of memory" in str(error).lower()
+
+
 def gpu_compute_type():
     """The first of GPU_COMPUTE_TYPES that the GPU supports, or the type saved in the model"""
     try:
@@ -291,6 +301,17 @@ def gpu_compute_type():
     except Exception:
         return "default"
     return next((kind for kind in GPU_COMPUTE_TYPES if kind in supported), "default")
+
+
+def gpu_compute_types():
+    """The compute types to try on a GPU, in order: the preferred one, then int8_float16, which needs less memory"""
+    types = [gpu_compute_type()]
+    try:
+        if types[0] != "int8_float16" and "int8_float16" in ctranslate2.get_supported_compute_types("cuda"):
+            types.append("int8_float16")
+    except Exception:
+        pass
+    return types
 
 
 SENTENCEPIECE_NAMES = ("sentencepiece.model", "sentencepiece.bpe.model", "source.spm", "source.spm.model")
@@ -334,6 +355,9 @@ class Engine:
         self.lid_model = None  # the fastText language identification model, loaded once
         self.translator = None
         self.device = "cpu"  # "cuda" when the model runs on an NVIDIA GPU
+        self.compute_type = ""  # the type a model on a GPU runs as; the CPU keeps the type of the files
+        # Overrides of the limits of a call (see limits), for tests and for the memory of a GPU; None uses the defaults
+        self.batch_sentences = self.call_tokens = self.max_batch_tokens = None
         self.sp_model = None
         self.model_dir = ""
         self.model_type = None  # "m2m", "nllb", "other", or None until a model is selected
@@ -371,14 +395,19 @@ class Engine:
             )
         changed = self.inspect_model(model_dir)
         if device == "cuda" and gpu_count() > 0:
-            try:
-                translator = ctranslate2.Translator(model_dir, device="cuda", compute_type=gpu_compute_type())
-            except RuntimeError as error:  # for example, not enough memory on the GPU
-                message = str(error)
-                if any(name in message.lower() for name in CUDA_LIBRARY_NAMES):
-                    message += "\n\nCTranslate2 needs the NVIDIA CUDA 12 libraries to use a GPU. Install CUDA 12.x from developer.nvidia.com/cuda-downloads."
-                raise EngineError("The GPU could not load the model", message + "\n\nYou can choose the CPU in the Preferences.")
-            self.device = "cuda"
+            types = gpu_compute_types()
+            for compute_type in types:
+                try:
+                    translator = ctranslate2.Translator(model_dir, device="cuda", compute_type=compute_type)
+                    break
+                except RuntimeError as error:
+                    if is_out_of_memory(error) and compute_type != types[-1]:
+                        continue  # try the type that needs less memory
+                    message = str(error)  # for example, not enough memory on the GPU
+                    if any(name in message.lower() for name in CUDA_LIBRARY_NAMES):
+                        message += "\n\nCTranslate2 needs the NVIDIA CUDA 12 libraries to use a GPU. Install CUDA 12.x from developer.nvidia.com/cuda-downloads."
+                    raise EngineError("The GPU could not load the model", message + "\n\nYou can choose the CPU in the Preferences.")
+            self.device, self.compute_type = "cuda", compute_type
         else:
             translator = ctranslate2.Translator(
                 model_dir,
@@ -386,8 +415,9 @@ class Engine:
                 inter_threads=2,
                 intra_threads=int(os.cpu_count() / 2),
             )
-            self.device = "cpu"
+            self.device, self.compute_type = "cpu", ""
         self.translator = translator
+        self.batch_sentences = self.call_tokens = self.max_batch_tokens = None
         self.model_dir = model_dir
         return changed
 
@@ -449,6 +479,13 @@ class Engine:
 
     # Translation
 
+    def limits(self):
+        """Sentences per call, tokens per call (None for no limit), and tokens per CTranslate2 batch, for the device in use"""
+        gpu = self.device == "cuda"
+        sentences = self.batch_sentences or (GPU_BATCH_SENTENCES if gpu else BATCH_SENTENCES)
+        call_tokens = (GPU_BATCH_TOKENS if gpu else None) if self.call_tokens is None else (self.call_tokens or None)
+        return sentences, call_tokens, self.max_batch_tokens or (GPU_BATCH_TOKENS if gpu else MAX_BATCH_TOKENS)
+
     def split(self, text, source_lang_code, join=False):
         """Split a text into sentences, and the batches to translate
 
@@ -458,7 +495,20 @@ class Engine:
             words (int): number of words
         """
         sentences, breaks = paragraph_tokenizer(join_lines(text) if join else text, source_lang_code)
-        batches = [sentences[i : i + BATCH_SENTENCES] for i in range(0, len(sentences), BATCH_SENTENCES)]
+        per_call, call_tokens, _ = self.limits()
+        # A call ends at the sentence limit or the token limit, whichever comes first; the tokens are those of the source
+        # and the two that translate_batch adds, so the limit holds for sentences of any language
+        sizes = [len(tokens) + 2 for tokens in self.sp_model.encode(sentences, out_type=str)] if call_tokens and self.sp_model else None
+        batches, batch, tokens = [], [], 0
+        for i, sentence in enumerate(sentences):
+            size = sizes[i] if sizes else 0
+            if batch and (len(batch) >= per_call or (sizes and tokens + size > call_tokens)):
+                batches.append(batch)
+                batch, tokens = [], 0
+            batch.append(sentence)
+            tokens += size
+        if batch:
+            batches.append(batch)
         return sentences, breaks, batches, max(len(" ".join(sentences).split()), 1)
 
     def translate_batch(self, batch, beam_size, target_lang_code, src_prefix, repetition_penalty=1.0):
@@ -469,15 +519,24 @@ class Engine:
             source_tok = [sent + ["</s>"] for sent in source_tok]
 
         target_prefix = [[target_lang_code]] * len(batch) if target_lang_code else None
-        results = self.translator.translate_batch(
-            source=source_tok,
-            beam_size=beam_size,
-            batch_type="tokens",
-            max_batch_size=1024 if target_prefix else 2048,
-            replace_unknowns=True,
-            repetition_penalty=repetition_penalty,
-            target_prefix=target_prefix,
-        )
+        max_batch = self.limits()[2]
+        while True:
+            try:
+                results = self.translator.translate_batch(
+                    source=source_tok,
+                    beam_size=beam_size,
+                    batch_type="tokens",
+                    max_batch_size=max_batch if target_prefix else 2 * max_batch,
+                    replace_unknowns=True,
+                    repetition_penalty=repetition_penalty,
+                    target_prefix=target_prefix,
+                )
+                break
+            except RuntimeError as error:
+                if not is_out_of_memory(error) or max_batch <= MIN_BATCH_TOKENS:
+                    raise
+                max_batch //= 2  # the GPU ran out of memory, so try smaller batches, and keep them for the next calls
+                self.max_batch_tokens = max_batch
 
         translations = []
         for result in results:

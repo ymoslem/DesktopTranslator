@@ -396,7 +396,7 @@ class Window(QMainWindow):
         self.target_text.setPlaceholderText("Translation")
         self.model_label.setText("Model: " + short_text(os.path.basename(os.path.normpath(model_dir)), 40)
                                  + (" (GPU)" if self.engine.device == "cuda" else ""))
-        self.model_label.setToolTip(model_dir)
+        self.model_label.setToolTip(model_dir + ("\nNVIDIA GPU, " + self.engine.compute_type if self.engine.device == "cuda" else "\nCPU"))
 
     def restore_target(self):
         remember = self.preferences.get("remember_model_paths", True)
