@@ -58,11 +58,11 @@ from gui.constants import (
     TARGET_PLACEHOLDER,
     VERSION,
 )
-from gui import diagnostics
+from gui import diagnostics, updates
 from gui.dialogs import DiagnosticsDialog, DocumentDialog, DownloadDialog, PreferencesDialog, WelcomeDialog
 from gui.helpers import short_text
 from gui.widgets import InfoSign, LanguageBox, SourceEdit
-from gui.workers import DocumentWorker, ModelDownloadWorker, Worker
+from gui.workers import DocumentWorker, ModelDownloadWorker, UpdateWorker, Worker
 from utils.paragraph_splitter import TextBuilder, paragraph_detokenizer
 
 
@@ -74,6 +74,7 @@ class Window(QMainWindow):
         self.preferences = Preferences()
         self.engine.cpu_speed = self.preferences.get("cpu_speed", "standard")
         self.worker = None
+        self.update_worker = None
         self.last_error = None  # title and message of the last error shown, for the diagnostic info
         self.translation = ""
         self.file_name = ""
@@ -255,6 +256,7 @@ class Window(QMainWindow):
         help_menu = bar.addMenu("&Help")
         self.action(help_menu, "Download " + MODEL_DOWNLOAD["name"] + "...", self.download_first_model)
         self.action(help_menu, "Get Models...", self.show_models)
+        self.action(help_menu, "Check for Updates...", self.check_updates)
         self.action(help_menu, "Copy Diagnostic Info...", self.show_diagnostics)
         self.action(help_menu, "Report an Issue...", lambda: QDesktopServices.openUrl(QUrl(ISSUES_URL)))
         about = self.action(help_menu, "About " + APP_NAME, self.show_about)
@@ -751,6 +753,34 @@ class Window(QMainWindow):
             self.say("The device changes when a model is opened.")
         elif self.engine.translator is not None and not self.load_model(self.engine.model_dir):
             self.preferences.set("device", previous)  # the model did not fit on the GPU; the CPU model is still loaded
+
+    def check_updates(self):
+        """Ask GitHub for the latest version; this is the only time that the app does it, and only when the user chooses it"""
+        if self.update_worker is not None:
+            return
+        self.say("Checking for updates...")
+        self.update_worker = UpdateWorker()
+        self.update_worker.found.connect(self.on_update_found)
+        self.update_worker.failed.connect(self.on_update_failed)
+        self.update_worker.finished.connect(self.on_update_finished)
+        self.update_worker.start()
+
+    def on_update_found(self, tag, url):
+        self.say("")
+        if updates.is_newer(tag, VERSION):
+            answer = QMessageBox.question(
+                self, "Update available", APP_NAME + " " + tag.lstrip("v") + " is available, and you have " + VERSION + ".\n\nOpen the releases page?")
+            if answer == QMessageBox.StandardButton.Yes:
+                QDesktopServices.openUrl(QUrl(url))
+        else:
+            QMessageBox.information(self, "Check for Updates", "You have the latest version, " + VERSION + ".")
+
+    def on_update_failed(self, message):
+        self.say("")
+        self.show_error("Check for Updates", "The latest version could not be found: " + message)
+
+    def on_update_finished(self):
+        self.update_worker = None
 
     def show_error(self, title, message):
         """Show an error, and keep it for the diagnostic info"""

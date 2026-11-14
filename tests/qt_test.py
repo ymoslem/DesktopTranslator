@@ -802,6 +802,66 @@ shown_dialogs[0].copy()
 check(qt_app.QApplication.clipboard().text() == report and shown_dialogs[0].edit.isReadOnly() is False, "the diagnostic info can be changed, and it is copied")
 diag_window.close()
 
+# Check for updates: asks a local server, only when the user chooses it
+import gui.updates
+
+check("Check for Updates..." in [a.text() for a in window.menuBar().actions()[-1].menu().actions()], "the Help menu has Check for Updates")
+check(gui.updates.is_newer("v0.4.10", "0.4.9") and gui.updates.is_newer("v0.5.0", "0.4.9") and not gui.updates.is_newer("v0.4.2", "0.4.2")
+      and not gui.updates.is_newer("v0.4.1", "0.4.2-dev"), "versions are compared by their numbers")
+latest = {"tag_name": "v9.9.9", "html_url": "https://example.org/releases/v9.9.9"}
+
+
+class LatestHandler(http.server.BaseHTTPRequestHandler):
+    seen = []
+
+    def do_GET(self):
+        LatestHandler.seen.append(self.headers.get("User-Agent"))
+        body = json.dumps(latest).encode()
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+latest_server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), LatestHandler)
+threading.Thread(target=latest_server.serve_forever, daemon=True).start()
+gui.updates.LATEST_URL = "http://127.0.0.1:%d/latest" % latest_server.server_port
+update_window = qt_app.Window()
+
+
+def check_updates_now():
+    messages.clear()
+    update_window.check_updates()
+    deadline = time.time() + 20
+    while update_window.update_worker is not None and time.time() < deadline:
+        app.processEvents()
+        time.sleep(0.01)
+
+
+opened_pages = []
+real_open_url = qt_app.QDesktopServices.openUrl
+qt_app.QDesktopServices.openUrl = staticmethod(lambda url: opened_pages.append(url.toString()) or True)
+real_question = QMessageBox.question
+QMessageBox.question = staticmethod(lambda parent, title, text, *a: (messages.append((title, text)), QMessageBox.StandardButton.Yes)[1])
+check(not LatestHandler.seen, "nothing asks for updates before the user chooses it")
+check_updates_now()
+check(messages and messages[-1][0] == "Update available" and "9.9.9" in messages[-1][1] and opened_pages == ["https://example.org/releases/v9.9.9"]
+      and LatestHandler.seen == ["DesktopTranslator/" + qt_app.VERSION], "a newer version is offered, and the page opens when the user agrees")
+latest["tag_name"] = "v" + qt_app.VERSION
+check_updates_now()
+check(messages and messages[-1][0] == "Check for Updates" and "latest version" in messages[-1][1], "the latest version is said to be the latest")
+latest_server.shutdown()
+latest_server.server_close()
+check_updates_now()
+check(update_window.last_error and update_window.last_error[0] == "Check for Updates" and "could not be found" in update_window.last_error[1],
+      "an unreachable server is reported")
+QMessageBox.question = real_question
+qt_app.QDesktopServices.openUrl = real_open_url
+update_window.close()
+
 # The device in the Preferences
 count_boxes = lambda dialog: len(dialog.findChildren(QComboBox))
 check(count_boxes(qt_app.PreferencesDialog(window, 3, False, True, False)) == 2

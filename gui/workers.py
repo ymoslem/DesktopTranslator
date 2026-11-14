@@ -1,7 +1,8 @@
-"""Background threads, so that translating and downloading do not freeze the window"""
+"""Background threads, so that translating, downloading and checking for updates do not freeze the window"""
 from PySide6.QtCore import QThread, Signal
 
 from engine import EngineError, download_model
+from gui import updates
 
 
 class Worker(QThread):
@@ -76,3 +77,16 @@ class ModelDownloadWorker(QThread):
             self.failed.emit(error.title, error.message)
         except Exception as error:
             self.failed.emit("Download failed", str(error))
+
+
+class UpdateWorker(QThread):
+    """Asks GitHub for the latest version in the background"""
+
+    found = Signal(str, str)  # the tag and the page of the latest release
+    failed = Signal(str)
+
+    def run(self):
+        try:
+            self.found.emit(*updates.fetch_latest())
+        except Exception as error:
+            self.failed.emit(str(error))
