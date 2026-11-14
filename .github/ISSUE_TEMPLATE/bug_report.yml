@@ -16,5 +16,5 @@ body:
     id: diagnostics
     attributes:
       label: Diagnostic info
-      description: In the app, choose Help > Copy Diagnostic Info..., check the text, copy it, and paste it here. It has versions, hardware, settings, the name of the model folder, and the last error. It does not include private information such as your text, file names, or paths; check it before you share it.
+      description: In the app, choose Help > Copy Diagnostic Info..., check the text, copy it, and paste it here. The report includes versions, hardware, settings, the name of the model folder, and the last error. It does **not** include your text, file names, or paths. Check it before you share it.
       render: markdown

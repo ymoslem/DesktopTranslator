@@ -69,7 +69,7 @@ Each sentence is translated on its own, and a sentence that repeats is translate
 
 **Updates.** Choose <kbd>Help</kbd> menu \> <kbd>Check for Updates...</kbd> to see whether a newer version is available. This asks GitHub for the latest release, and the app does it only when you choose it. The app also connects to the internet when you download a model. It does not update itself.
 
-**Reporting an issue.** Choose <kbd>Help</kbd> menu \> <kbd>Copy Diagnostic Info...</kbd>, check the text, copy it, and paste it into a [new issue](https://github.com/ymoslem/DesktopTranslator/issues/new). It has the versions, the hardware, the settings, the name of the model folder, and the last error. It does not include private information such as your text, file names, or paths; check it before you share it.
+**Reporting an issue.** Choose <kbd>Help</kbd> menu \> <kbd>Copy Diagnostic Info...</kbd>, check the text, copy it, and paste it into a [new issue](https://github.com/ymoslem/DesktopTranslator/issues/new). The report includes the versions, the hardware, the settings, the name of the model folder, and the last error. It does **not** include your text, file names, or paths. Check it before you share it.
 
 **Memory.** Larger models need more memory. The app warns you if the computer may not have enough free memory for the model you open.
 
