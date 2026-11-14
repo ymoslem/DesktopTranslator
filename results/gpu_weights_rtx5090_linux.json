@@ -1,0 +1,29 @@
+{
+ "machine": {
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3",
+  "ctranslate2": "4.8.4"
+ },
+ "sentences": 600,
+ "beam": 3,
+ "batch": 8,
+ "rows": {
+  "French": {
+   "chrf_int8_files": 67.90962101387458,
+   "chrf_float16_files": 67.7066129044235,
+   "difference": -0.2030081094510905,
+   "low": -0.47482623610241603,
+   "high": 0.02525132686547238,
+   "different_sentences": 80
+  },
+  "Arabic": {
+   "chrf_int8_files": 51.58141746970234,
+   "chrf_float16_files": 51.601710387901726,
+   "difference": 0.020292918199388055,
+   "low": -0.19936232143142973,
+   "high": 0.2597316532617171,
+   "different_sentences": 181
+  }
+ },
+ "device_used": "cuda"
+}

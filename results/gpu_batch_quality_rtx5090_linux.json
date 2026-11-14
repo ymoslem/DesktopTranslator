@@ -1,0 +1,84 @@
+{
+ "machine": {
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "python": "3.12.3",
+  "ctranslate2": "4.8.4"
+ },
+ "device_used": "cuda",
+ "sentences": 600,
+ "beam": 3,
+ "pairs": [
+  [
+   8,
+   1024
+  ],
+  [
+   64,
+   4096
+  ],
+  [
+   128,
+   4096
+  ],
+  [
+   128,
+   16384
+  ]
+ ],
+ "rows": {
+  "French": {
+   "8,1024": {
+    "chrf": 67.90962101387458,
+    "different_from_default": 0
+   },
+   "64,4096": {
+    "chrf": 67.86345989690132,
+    "different_from_default": 35,
+    "difference_from_default": -0.0461611169732663,
+    "low": -0.1947418845223723,
+    "high": 0.09933230924220027
+   },
+   "128,4096": {
+    "chrf": 67.87648649462324,
+    "different_from_default": 34,
+    "difference_from_default": -0.03313451925134814,
+    "low": -0.18950729820136303,
+    "high": 0.11574518370548503
+   },
+   "128,16384": {
+    "chrf": 67.89148216968938,
+    "different_from_default": 32,
+    "difference_from_default": -0.018138844185202174,
+    "low": -0.1600677629358529,
+    "high": 0.10759767513062002
+   }
+  },
+  "Arabic": {
+   "8,1024": {
+    "chrf": 51.58141746970234,
+    "different_from_default": 0
+   },
+   "64,4096": {
+    "chrf": 51.573409924218,
+    "different_from_default": 89,
+    "difference_from_default": -0.008007545484339573,
+    "low": -0.13044036373849366,
+    "high": 0.13888930598040616
+   },
+   "128,4096": {
+    "chrf": 51.54262392910083,
+    "different_from_default": 77,
+    "difference_from_default": -0.0387935406015103,
+    "low": -0.16549257607624668,
+    "high": 0.09866118747986974
+   },
+   "128,16384": {
+    "chrf": 51.58303031879905,
+    "different_from_default": 85,
+    "difference_from_default": 0.0016128490967091125,
+    "low": -0.16579717364862034,
+    "high": 0.1504236120961977
+   }
+  }
+ }
+}

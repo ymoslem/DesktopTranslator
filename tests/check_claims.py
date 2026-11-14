@@ -9,6 +9,9 @@ if a claim and the results disagree. The claims are
   - beam sizes 2 and 5 are comparable to beam size 3 (CHANGELOG, tooltip of Translation quality)
   - a larger beam size takes longer (tooltip of Translation quality, README)
   - a model on a GPU runs as float16, tested on an NVIDIA RTX 5090 with Linux (CHANGELOG, README)
+  - on a GPU, 128 sentences per call with 4,096 tokens run about 4 times as fast as the CPU settings (engine.py)
+  - with those settings, chrF++ is within 0.05 of the CPU settings and the difference is comparable (engine.py)
+  - the int8 files run as float16 are comparable to a model converted straight to float16 (README)
 """
 import json
 import os
@@ -71,6 +74,21 @@ def main():
     rows = gpu["rows"]
     check(rows["app"]["device_used"] == "cuda" and rows["app"]["chrf"] == rows["float16"]["chrf"]
           and rows["float16"]["same_as_first"] == gpu["sentences"], "the app runs a model on the GPU as float16, with the same translations")
+
+    sweep = load("gpu_batch_rtx5090_linux.json")
+    speed = {(r["sentences_per_call"], r["token_limit"]): r["words_per_second"] for r in sweep["rows"]}
+    ratio = speed[(128, 4096)] / speed[(8, 1024)]
+    check(round(ratio) == 4 and sweep["default"] == {"sentences_per_call": 8, "token_limit": 1024},
+          "128 sentences with 4,096 tokens run %.2f times as fast as 8 sentences with 1,024" % ratio)
+    quality = load("gpu_batch_quality_rtx5090_linux.json")
+    for name, pairs in quality["rows"].items():
+        for pair in ("128,4096",):
+            row = pairs[pair]
+            check(abs(row["difference_from_default"]) <= 0.05 + 1e-9 and row["low"] <= 0 <= row["high"],
+                  "%s, 128 sentences with 4,096 tokens: chrF++ difference %+.2f [%+.2f, %+.2f]" % (name, row["difference_from_default"], row["low"], row["high"]))
+    weights = load("gpu_weights_rtx5090_linux.json")
+    for name, row in weights["rows"].items():
+        check(row["low"] <= 0 <= row["high"], "%s, int8 files as float16 against float16 weights: comparable (%+.2f [%+.2f, %+.2f])" % (name, row["difference"], row["low"], row["high"]))
     print("\nAll claims agree with the results.")
 
 
