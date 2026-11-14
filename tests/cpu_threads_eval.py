@@ -9,7 +9,7 @@ batches of a call can be translated at the same time. A call of 8 sentences is o
 times this layout and a layout with one worker that has all the cores, each with 8 and with 32 sentences per call, in
 alternating rounds (CPU_THREADS_ROUNDS, 3 by default), each round in another order, after a warm-up run of each. It records the
 words per second of every run, the medians, and the ratio of each median to that of the layout of the app with 8 sentences. The
-machine is recorded without paths or names.
+machine is recorded without paths or names. The environment variable CPU_THREADS_CORES gives the cores to assume, for a container.
 """
 import json
 import os
@@ -27,7 +27,9 @@ from utils.paragraph_splitter import paragraph_detokenizer  # noqa: E402
 
 WORDS = int(os.environ.get("CPU_THREADS_WORDS", 1000))
 ROUNDS = int(os.environ.get("CPU_THREADS_ROUNDS", 3))
-CORES = os.cpu_count()
+VISIBLE = os.cpu_count()
+CORES = int(os.environ.get("CPU_THREADS_CORES", 0)) or VISIBLE  # a container sees the cores of its host
+os.cpu_count = lambda: CORES  # the engine takes the CPU threads of the app from it
 
 
 def text_of(flores, words):
@@ -69,7 +71,7 @@ def main(flores, model_dir, output):
         run(translator, text[: len(text) // 4], sentences)
     results = {
         "machine": {"platform": platform.platform(), "processor": platform.processor(), "machine": platform.machine(),
-                    "cores": CORES, "python": platform.python_version(), "ctranslate2": ctranslate2.__version__},
+                    "cores": CORES, "cores_visible": VISIBLE, "python": platform.python_version(), "ctranslate2": ctranslate2.__version__},
         "words": words, "rounds": ROUNDS, "app_threads": {"workers": 2, "threads_each": int(CORES / 2)},
         "words_per_second": {name: [] for name in names},
     }
