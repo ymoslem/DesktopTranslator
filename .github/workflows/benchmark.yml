@@ -1,8 +1,11 @@
-name: Benchmark the CPU batch size
+name: Benchmark the CPU
 
 on:
   workflow_dispatch:
     inputs:
+      script:
+        description: "Script of the tests folder to run (cpu_batch_eval.py or cpu_threads_eval.py)"
+        default: "cpu_batch_eval.py"
       words:
         description: "Words of the text to translate"
         default: "1000"
@@ -44,13 +47,15 @@ jobs:
               archive.extract("./flores200_dataset/devtest/eng_Latn.devtest", "flores")
           EOF
 
-      - name: Compare the batch sizes
+      - name: Run the script
         env:
           CPU_BATCH_WORDS: ${{ inputs.words }}
           CPU_BATCH_ROUNDS: ${{ inputs.rounds }}
-        run: python tests/cpu_batch_eval.py flores models/nllb-200-distilled-600M-int8 cpu_batch_${{ matrix.os }}.json
+          CPU_THREADS_WORDS: ${{ inputs.words }}
+          CPU_THREADS_ROUNDS: ${{ inputs.rounds }}
+        run: python tests/${{ inputs.script }} flores models/nllb-200-distilled-600M-int8 result_${{ matrix.os }}.json
 
       - uses: actions/upload-artifact@v7
         with:
-          name: cpu-batch-${{ matrix.os }}
-          path: cpu_batch_*.json
+          name: cpu-${{ inputs.script }}-${{ matrix.os }}
+          path: result_*.json
