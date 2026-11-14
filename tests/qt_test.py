@@ -671,6 +671,51 @@ speed_window.close()
 window.preferences.set("cpu_speed", "standard")
 window.save_settings()
 
+# The Automatic speed: the calls grow when the computer is fast, and stay small when it is slow
+import types
+
+clock = types.SimpleNamespace(now=0.0)
+
+
+class AutoResult:
+    hypotheses = [["\u2581fra_Latn", "\u2581ok"]]
+
+
+class TimedCpu:
+    """A translator that takes a time in proportion to the tokens"""
+
+    def __init__(self, tokens_per_second):
+        self.rate = tokens_per_second
+
+    def translate_batch(self, **kwargs):
+        clock.now += sum(len(tokens) for tokens in kwargs["source"]) / self.rate
+        return [AutoResult() for _ in kwargs["source"]]
+
+
+def automatic_calls(rate, cancel_after=None):
+    cpu_engine.cpu_speed = "automatic"
+    cpu_engine.translator = TimedCpu(rate)
+    batches = cpu_engine.split(text, "en")[2]
+    seen = []
+    real_time = engine_module.time
+    engine_module.time = types.SimpleNamespace(perf_counter=lambda: clock.now)
+    try:
+        output = cpu_engine.translate(batches, 3, "fra_Latn", "eng_Latn", is_cancelled=lambda: cancel_after is not None and len(seen) >= cancel_after,
+                                      on_batch=lambda done: seen.append(len(done) - sum(seen)))
+    finally:
+        engine_module.time = real_time
+        cpu_engine.cpu_speed = "standard"
+    return seen, output
+
+
+seen, output = automatic_calls(20000)
+check(sum(seen) == 300 and len(output) == 300 and max(seen) > seen[0] and max(seen) <= engine_module.AUTOMATIC_MAX_SENTENCES
+      and all(seen[i] <= 2 * seen[i - 1] + 2 for i in range(1, len(seen))), "Automatic on a fast computer: the calls grow, at most twice each time: %s" % seen)
+seen, output = automatic_calls(20)
+check(sum(seen) == 300 and len(output) == 300 and max(seen[:-1]) - min(seen[:-1]) <= 3, "Automatic on a slow computer: the calls keep the first size, give or take the length of the numbers: %s" % seen[:6])
+seen, output = automatic_calls(20000, cancel_after=1)
+check(output is None and len(seen) == 1, "Automatic stops at once when it is cancelled")
+
 # When the memory of the GPU runs out during a translation, the batches become smaller
 
 

@@ -227,7 +227,9 @@ class PreferencesDialog(QDialog):
                           "In our tests, beam size 1 was clearly worse than 3, and beam size 5 was not clearly better."))
         form.addRow("Speed on the CPU:", with_info(
             self.speed_box, "Larger batches make translation on the CPU faster, and progress and Cancel update less often. "
-                            "In our tests, Fastest was about 1.2 to 1.5 times as fast as Standard."))
+                            "In our tests, Fastest was about 1.2 to 1.5 times as fast as Standard. "
+                            "Automatic makes each batch as large as the speed of your computer allows in about 5 seconds, "
+                            "so the same text can be translated a little differently from one run to another."))
         if gpu:
             form.addRow("Run on:", with_info(
                 self.device_box, "GPU can be faster than the CPU, if its memory is large enough for the model. "

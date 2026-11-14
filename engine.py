@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.request
 import zipfile
@@ -31,7 +32,11 @@ MAX_BATCH_TOKENS = 1024  # CTranslate2 splits a call into batches of at most thi
 GPU_BATCH_SENTENCES = 128
 # On the CPU, larger calls are about 1.2 to 1.5 times as fast on the machines we tested, and progress and Cancel then update less often
 # (see tests/cpu_threads_eval.py). The user chooses the level; a call also ends at 40 tokens per sentence of its limit.
-CPU_SENTENCES = {"standard": BATCH_SENTENCES, "faster": 16, "fastest": 32}
+CPU_SENTENCES = {"standard": BATCH_SENTENCES, "faster": 16, "fastest": 32, "automatic": BATCH_SENTENCES}
+# Automatic: the first call is the size of Standard, and each next call is as large as the speed of the one before allows to take
+# about this many seconds, at most twice as large as that one, and at most this many sentences
+AUTOMATIC_SECONDS = 5
+AUTOMATIC_MAX_SENTENCES = 128
 TOKENS_PER_SENTENCE = 40
 GPU_BATCH_TOKENS = 4096
 MIN_BATCH_TOKENS = 128  # the smallest limit after the memory of the GPU runs out
@@ -566,6 +571,8 @@ class Engine:
         """Translate the batches; returns the translated sentences, or None if cancelled
 
         on_progress gets the number of words done, and on_batch gets the sentences translated so far."""
+        if self.device != "cuda" and self.cpu_speed == "automatic":
+            return self.translate_automatic(batches, beam_size, target_lang_code, src_prefix, is_cancelled, on_progress, repetition_penalty, on_batch)
         translations, known = [], {}
         words_done = 0
         for batch in batches:
@@ -573,6 +580,39 @@ class Engine:
                 return None
             translations.extend(self.translate_new(batch, known, beam_size, target_lang_code, src_prefix, repetition_penalty))
             words_done += len(" ".join(batch).split())
+            if on_batch:
+                on_batch(translations)
+            if on_progress:
+                on_progress(words_done)
+        return translations
+
+    def translate_automatic(self, batches, beam_size, target_lang_code, src_prefix, is_cancelled, on_progress, repetition_penalty, on_batch):
+        """Translate the sentences of the batches in calls whose size follows the speed of the computer
+
+        A call has the tokens that the speed of the previous call allows in AUTOMATIC_SECONDS, but not fewer than the
+        first call, so a slow computer keeps the calls of Standard. The same text can be split differently on
+        another computer, or at another time, so the translation of some sentences can differ a little."""
+        sentences = [sentence for batch in batches for sentence in batch]
+        sizes = [len(tokens) + 2 for tokens in self.sp_model.encode(sentences, out_type=str)]
+        first = TOKENS_PER_SENTENCE * self.limits()[0]
+        budget, rate = first, None
+        translations, known = [], {}
+        words_done = start = 0
+        while start < len(sentences):
+            if is_cancelled():
+                return None
+            end, used = start, 0
+            while end < len(sentences) and end - start < AUTOMATIC_MAX_SENTENCES and (end == start or used + sizes[end] <= budget):
+                used += sizes[end]
+                end += 1
+            batch = sentences[start:end]
+            began = time.perf_counter()
+            translations.extend(self.translate_new(batch, known, beam_size, target_lang_code, src_prefix, repetition_penalty))
+            speed = used / max(time.perf_counter() - began, 0.001)
+            rate = speed if rate is None else (rate + speed) / 2  # smoothed, so one slow call does not change the size much
+            budget = int(min(max(rate * AUTOMATIC_SECONDS, first), 2 * max(used, first)))
+            words_done += len(" ".join(batch).split())
+            start = end
             if on_batch:
                 on_batch(translations)
             if on_progress:
