@@ -14,6 +14,7 @@ if a claim and the results disagree. The claims are
   - on one machine, with 8 sentences per batch, the GPU is about 7 times as fast as a CPU with 16 threads and about 15 times as fast as one with 4 threads
   - with those settings, chrF++ is within 0.05 of the CPU settings and the difference is comparable (engine.py)
   - the int8 files run as float16 are comparable to a model converted straight to float16 (README)
+  - on the CPU, 32 sentences per call are about 1.2 to 1.5 times as fast as 8 on every machine tested (tooltip of Speed on the CPU)
 """
 import json
 import os
@@ -97,6 +98,16 @@ def main():
         check(same["paragraph_seconds"]["gpu"]["median"] < same["paragraph_seconds"]["cpu"]["median"],
               "%d cores: a paragraph of %d words takes %.2f s on the GPU and %.2f s on the CPU" % (
                   cores, same["paragraph_words"], same["paragraph_seconds"]["gpu"]["median"], same["paragraph_seconds"]["cpu"]["median"]))
+    gains = {}
+    for name in ("windows", "macos", "ubuntu"):
+        threads = load("cpu_threads_runner_%s.json" % name)["median_words_per_second"]
+        gains["%s runner" % name] = threads["app: 2 workers, half of the cores each, 32 sentences"] / threads["app: 2 workers, half of the cores each, 8 sentences"]
+    pod = load("cpu_threads_pod_32cores.json")["median_words_per_second"]
+    gains["server with 32 vCPUs"] = pod["app: 2 workers, half of the cores each, 32 sentences"] / pod["app: 2 workers, half of the cores each, 8 sentences"]
+    batch = load("cpu_batch_runner_windows.json")["median_words_per_second"]
+    gains["windows runner, batch benchmark"] = batch["32"] / batch["8"]
+    for machine, gain in gains.items():
+        check(1.2 <= gain <= 1.55, "%s: 32 sentences per call are %.2f times as fast as 8 on the CPU" % (machine, gain))
     quality = load("gpu_batch_quality_rtx5090_linux.json")
     for name, pairs in quality["rows"].items():
         for pair in ("128,4096",):

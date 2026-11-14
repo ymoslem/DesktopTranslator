@@ -8,8 +8,9 @@ into French with a beam size of 3 on the CPU. The app runs two workers, each wit
 batches of a call can be translated at the same time. A call of 8 sentences is one batch, which leaves one worker idle. The script
 times this layout and a layout with one worker that has all the cores, each with 8 and with 32 sentences per call, in
 alternating rounds (CPU_THREADS_ROUNDS, 3 by default), each round in another order, after a warm-up run of each. It records the
-words per second of every run, the medians, and the ratio of each median to that of the layout of the app with 8 sentences. The
-machine is recorded without paths or names. The environment variable CPU_THREADS_CORES gives the cores to assume, for a container.
+words per second of every run, the medians, and the ratio of each median to the first one (the layout of the app with 8 sentences). The
+machine is recorded without paths or names. The environment variable CPU_THREADS_CORES gives the cores to assume, for a container, and CPU_THREADS_LAYOUTS (such as 2x16,1x8)
+replaces the layouts and the sentence counts by those layouts, with 8 sentences per call.
 """
 import json
 import os
@@ -64,7 +65,13 @@ def main(flores, model_dir, output):
         "app: 2 workers, half of the cores each": translator.translator,
         "1 worker, all the cores": ctranslate2.Translator(model_dir, device="cpu", inter_threads=1, intra_threads=CORES),
     }
-    configs = [(layout, sentences) for sentences in (8, 32) for layout in layouts]
+    spec = os.environ.get("CPU_THREADS_LAYOUTS")  # for example "2x16,1x8": workers times threads, with 8 sentences per call
+    if spec:
+        layouts = {}
+        for item in spec.split(","):
+            workers, threads = (int(n) for n in item.split("x"))
+            layouts[item] = ctranslate2.Translator(model_dir, device="cpu", inter_threads=workers, intra_threads=threads)
+    configs = [(layout, 8) for layout in layouts] if spec else [(layout, sentences) for sentences in (8, 32) for layout in layouts]
     names = ["%s, %d sentences" % config for config in configs]
     for layout, sentences in configs:  # warm-up
         translator.translator = layouts[layout]
@@ -86,9 +93,9 @@ def main(flores, model_dir, output):
     medians = {name: statistics.median(values) for name, values in results["words_per_second"].items()}
     results["median_words_per_second"] = medians
     base = medians[names[0]]
-    results["ratio_to_app_8"] = {name: value / base for name, value in medians.items()}
+    results["ratio_to_first"] = {name: value / base for name, value in medians.items()}
     for name in names:
-        print("median %-45s %6.1f words/s  ratio to the app with 8 sentences: %.2f" % (name, medians[name], results["ratio_to_app_8"][name]))
+        print("median %-45s %6.1f words/s  ratio to the first: %.2f" % (name, medians[name], results["ratio_to_first"][name]))
     with open(output, "w", encoding="utf-8") as file:
         json.dump(results, file, indent=1)
 

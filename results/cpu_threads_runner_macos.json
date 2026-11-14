@@ -1,0 +1,59 @@
+{
+ "machine": {
+  "platform": "macOS-26.7.2-arm64-arm-64bit",
+  "processor": "arm",
+  "machine": "arm64",
+  "cores": 3,
+  "cores_visible": 3,
+  "python": "3.11.9",
+  "ctranslate2": "4.8.4"
+ },
+ "words": 602,
+ "rounds": 5,
+ "app_threads": {
+  "workers": 2,
+  "threads_each": 1
+ },
+ "words_per_second": {
+  "app: 2 workers, half of the cores each, 8 sentences": [
+   12.175324100756749,
+   8.69359785677297,
+   10.528230662372923,
+   13.814520887985376,
+   14.537571619207405
+  ],
+  "1 worker, all the cores, 8 sentences": [
+   22.466679363025047,
+   16.027064405064714,
+   21.992101313093094,
+   24.07878747220439,
+   29.340442748366943
+  ],
+  "app: 2 workers, half of the cores each, 32 sentences": [
+   17.051566620220466,
+   13.89146960915356,
+   16.537714350442865,
+   20.8493010399537,
+   22.084033259086027
+  ],
+  "1 worker, all the cores, 32 sentences": [
+   20.854674564285567,
+   27.766416900772807,
+   26.762039402990872,
+   32.43003381197029,
+   37.25296549977823
+  ]
+ },
+ "median_words_per_second": {
+  "app: 2 workers, half of the cores each, 8 sentences": 12.175324100756749,
+  "1 worker, all the cores, 8 sentences": 22.466679363025047,
+  "app: 2 workers, half of the cores each, 32 sentences": 17.051566620220466,
+  "1 worker, all the cores, 32 sentences": 27.766416900772807
+ },
+ "ratio_to_app_8": {
+  "app: 2 workers, half of the cores each, 8 sentences": 1.0,
+  "1 worker, all the cores, 8 sentences": 1.8452633520966104,
+  "app: 2 workers, half of the cores each, 32 sentences": 1.4005020711654517,
+  "1 worker, all the cores, 32 sentences": 2.280548482405245
+ }
+}

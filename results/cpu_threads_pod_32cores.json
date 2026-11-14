@@ -1,0 +1,51 @@
+{
+ "machine": {
+  "platform": "Linux-6.8.0-147-generic-x86_64-with-glibc2.39",
+  "processor": "x86_64",
+  "machine": "x86_64",
+  "cores": 32,
+  "cores_visible": 48,
+  "python": "3.12.3",
+  "ctranslate2": "4.8.4"
+ },
+ "words": 1017,
+ "rounds": 3,
+ "app_threads": {
+  "workers": 2,
+  "threads_each": 16
+ },
+ "words_per_second": {
+  "app: 2 workers, half of the cores each, 8 sentences": [
+   72.62902166183117,
+   72.95766584265093,
+   75.10779081337381
+  ],
+  "1 worker, all the cores, 8 sentences": [
+   34.70860141779405,
+   36.9227467172343,
+   34.15744410393588
+  ],
+  "app: 2 workers, half of the cores each, 32 sentences": [
+   88.17876636463302,
+   90.91803905106633,
+   93.15203660548852
+  ],
+  "1 worker, all the cores, 32 sentences": [
+   48.94371506567702,
+   50.705950411026016,
+   52.38040512133498
+  ]
+ },
+ "median_words_per_second": {
+  "app: 2 workers, half of the cores each, 8 sentences": 72.95766584265093,
+  "1 worker, all the cores, 8 sentences": 34.70860141779405,
+  "app: 2 workers, half of the cores each, 32 sentences": 90.91803905106633,
+  "1 worker, all the cores, 32 sentences": 50.705950411026016
+ },
+ "ratio_to_app_8": {
+  "app: 2 workers, half of the cores each, 8 sentences": 1.0,
+  "1 worker, all the cores, 8 sentences": 0.4757361823040049,
+  "app: 2 workers, half of the cores each, 32 sentences": 1.2461752716589214,
+  "1 worker, all the cores, 32 sentences": 0.6950051077618687
+ }
+}

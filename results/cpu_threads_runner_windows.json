@@ -1,0 +1,59 @@
+{
+ "machine": {
+  "platform": "Windows-10-10.0.26100-SP0",
+  "processor": "Intel64 Family 6 Model 207 Stepping 2, GenuineIntel",
+  "machine": "AMD64",
+  "cores": 4,
+  "cores_visible": 4,
+  "python": "3.11.9",
+  "ctranslate2": "4.8.4"
+ },
+ "words": 602,
+ "rounds": 5,
+ "app_threads": {
+  "workers": 2,
+  "threads_each": 2
+ },
+ "words_per_second": {
+  "app: 2 workers, half of the cores each, 8 sentences": [
+   37.626386532343744,
+   37.675261153081756,
+   39.026804523429384,
+   38.60483585336026,
+   37.39368895033846
+  ],
+  "1 worker, all the cores, 8 sentences": [
+   32.13160919246076,
+   33.023919323508615,
+   33.380287161627486,
+   32.384001005991216,
+   30.999506639246988
+  ],
+  "app: 2 workers, half of the cores each, 32 sentences": [
+   51.95077669086385,
+   54.15818004836526,
+   53.002305001570534,
+   52.21682044129964,
+   50.74686359304623
+  ],
+  "1 worker, all the cores, 32 sentences": [
+   43.10719188287824,
+   42.99653263676096,
+   42.43269158351414,
+   42.28626909280361,
+   40.983346519260046
+  ]
+ },
+ "median_words_per_second": {
+  "app: 2 workers, half of the cores each, 8 sentences": 37.675261153081756,
+  "1 worker, all the cores, 8 sentences": 32.384001005991216,
+  "app: 2 workers, half of the cores each, 32 sentences": 52.21682044129964,
+  "1 worker, all the cores, 32 sentences": 42.43269158351414
+ },
+ "ratio_to_app_8": {
+  "app: 2 workers, half of the cores each, 8 sentences": 1.0,
+  "1 worker, all the cores, 8 sentences": 0.8595561122830405,
+  "app: 2 workers, half of the cores each, 32 sentences": 1.385971028286513,
+  "1 worker, all the cores, 32 sentences": 1.1262746503893375
+ }
+}
