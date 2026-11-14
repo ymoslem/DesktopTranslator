@@ -1,7 +1,7 @@
 """Names, links and settings shared by the windows and dialogs"""
 
 APP_NAME = "DesktopTranslator"
-VERSION = "0.4.3"
+VERSION = "0.4.4"
 TARGET_PLACEHOLDER = "Select a language..."
 DEFAULT_TEXT_SIZE = 14
 DEVICES = ["CPU", "GPU (NVIDIA)"]

@@ -1,5 +1,5 @@
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.3-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.3/DesktopTranslator_Windows_0.4.3.exe)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.3-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.3/DesktopTranslator_macOS_0.4.3.zip)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.4-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.4/DesktopTranslator_Windows_0.4.4.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.4-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.4/DesktopTranslator_macOS_0.4.4.zip)
 
 # DesktopTranslator
 DesktopTranslator translates text and documents on your own computer. Nothing is sent to a server, and no internet connection is needed once you have a model. It runs [CTranslate2](https://github.com/OpenNMT/CTranslate2) models with SentencePiece, including the multilingual [NLLB-200](https://arxiv.org/abs/2207.04672) (200 languages) and [M2M-100](https://arxiv.org/abs/2010.11125) (100 languages) and bilingual models such as OPUS-MT.
@@ -32,8 +32,8 @@ DesktopTranslator translates text and documents on your own computer. Nothing is
     
 ## Download DesktopTranslator
    
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.3-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.3/DesktopTranslator_Windows_0.4.3.exe)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.3-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.3/DesktopTranslator_macOS_0.4.3.zip)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.4-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.4/DesktopTranslator_Windows_0.4.4.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.4-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.4/DesktopTranslator_macOS_0.4.4.zip)
 
 <img src="img/installer.png" width="497">
 
@@ -160,7 +160,7 @@ pyinstaller -y --windowed --name DesktopTranslator --add-data "utils;utils" --ad
 3. Try the `*.exe` file under "dist\DesktopTranslator" to make sure it works.
 4. Download and install [NSIS](https://nsis.sourceforge.io/Download), and then create the installer with the script [installer.nsi](installer.nsi). It installs the app to "Program Files", and adds Start menu and Desktop shortcuts and an uninstaller.
 ```
-makensis /DVERSION=0.4.3 installer.nsi
+makensis /DVERSION=0.4.4 installer.nsi
 ```
 
 If you prefer to create the installer with the NSIS graphical interface, you can follow these steps instead of step 4:

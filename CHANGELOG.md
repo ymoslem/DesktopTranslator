@@ -1,6 +1,13 @@
 # Changelog
 
 
+## v0.4.4
+
+### Fixed
+
+- Help > Check for Updates failed in the macOS app with "unable to get local issuer certificate", and the download of a model at the first start could fail the same way. Web requests now check certificates against the bundle of certifi as well as the system certificates, and the build check starts the packaged app to test this
+
+
 ## v0.4.3
 
 ### Added
