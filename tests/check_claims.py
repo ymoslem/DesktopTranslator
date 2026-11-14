@@ -10,6 +10,7 @@ if a claim and the results disagree. The claims are
   - a larger beam size takes longer (tooltip of Translation quality, README)
   - a model on a GPU runs as float16, tested on an NVIDIA RTX 5090 with Linux (CHANGELOG, README)
   - on a GPU, 128 sentences per call with 4,096 tokens run about 4 times as fast as the CPU settings (engine.py, CHANGELOG)
+  - on one machine, with 8 sentences per batch, the GPU is about 7 times as fast as a CPU with 16 threads and about 15 times as fast as one with 4 threads
   - with those settings, chrF++ is within 0.05 of the CPU settings and the difference is comparable (engine.py)
   - the int8 files run as float16 are comparable to a model converted straight to float16 (README)
 """
@@ -84,6 +85,17 @@ def main():
     check(round(alternating["ratio"]) == 4 and len(alternating["words_per_second"]["gpu settings"]) == alternating["rounds"] == 5
           and min(alternating["words_per_second"]["gpu settings"]) > max(alternating["words_per_second"]["cpu settings"]),
           "alternating rounds on one pod: %.2f times as fast, and every run of the GPU settings beats every run of the CPU settings" % alternating["ratio"])
+    for cores, expected in ((32, 7), (8, 15)):
+        same = load("gpu_cpu_same_machine_rtxpro4500_linux_%dcores.json" % cores)
+        runs, ratios = same["words_per_second"], same["ratios"]
+        check(same["machine"]["cores_assumed"] == cores and same["devices"] == {"cpu": "cpu", "gpu": "cuda"}, "%d cores: the CPU and the GPU of one machine" % cores)
+        check(round(ratios["gpu 8 over cpu 8"]) == expected and min(runs["gpu, 8 sentences"]) > max(runs["cpu, 8 sentences"]),
+              "%d cores, 8 sentences per batch: the GPU is %.1f times as fast as the CPU, in every run" % (cores, ratios["gpu 8 over cpu 8"]))
+        check(round(ratios["gpu 128 over gpu 8"]) == 4 and min(runs["gpu, 128 sentences"]) > max(runs["gpu, 8 sentences"]),
+              "%d cores: on the GPU, 128 sentences per batch are %.1f times as fast as 8" % (cores, ratios["gpu 128 over gpu 8"]))
+        check(same["paragraph_seconds"]["gpu"]["median"] < same["paragraph_seconds"]["cpu"]["median"],
+              "%d cores: a paragraph of %d words takes %.2f s on the GPU and %.2f s on the CPU" % (
+                  cores, same["paragraph_words"], same["paragraph_seconds"]["gpu"]["median"], same["paragraph_seconds"]["cpu"]["median"]))
     quality = load("gpu_batch_quality_rtx5090_linux.json")
     for name, pairs in quality["rows"].items():
         for pair in ("128,4096",):
