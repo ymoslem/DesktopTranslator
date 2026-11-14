@@ -1,0 +1,15 @@
+name: Suggest a feature
+description: Ask for something new or something that works better
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What you need
+      description: What would you like to do, and what stops you from doing it now?
+    validations:
+      required: true
+  - type: textarea
+    id: computer
+    attributes:
+      label: Your computer
+      description: If the request is about speed or memory, say which system, processor, memory, and graphics card you have. You can also paste the diagnostic info from Help > Copy Diagnostic Info.... The report includes the versions, the hardware, the settings, the name of the model folder, and the last error. It does **not** include your text, file names, or paths.
