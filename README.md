@@ -7,7 +7,8 @@ DesktopTranslator translates text and documents on your own computer. Nothing is
 * The source language is detected, and each sentence is translated on its own, keeping your paragraphs
 * The translation appears as it is made, and you can cancel and keep what is done
 * Long files are translated in the background with <kbd>File</kbd> menu \> <kbd>Translate Document...</kbd>
-* Right-to-left languages such as Arabic are edited right to left, and the app follows the dark mode of your system
+* Right-to-left languages such as Arabic are edited right to left
+* The app follows the dark mode of your system
 * Models can run on an NVIDIA GPU, chosen in <kbd>Edit</kbd> menu \> <kbd>Preferences...</kbd>
 * Installers for Windows and macOS, or run it from source
 
@@ -49,7 +50,7 @@ At the first start, the app offers to download the NLLB-200 distilled 600M model
 3. Type or paste text on the left, or open a file with <kbd>File</kbd> menu \> <kbd>Open Text...</kbd> (plain text files only; use <kbd>Reopen Text with Encoding...</kbd> if the characters look wrong). You can also drop a text file on the source pane.
 4. Click <kbd>Translate</kbd>. The translation appears as it is made, with the time left, and you can click <kbd>Cancel</kbd> to stop; the part that is done is kept. Use <kbd>Copy</kbd> or <kbd>File</kbd> menu \> <kbd>Save Translation...</kbd> when it is finished.
 
-Right-to-left languages such as Arabic, Persian, Urdu, and Hebrew are displayed and edited right to left, and the app follows the dark mode of your system. Use the <kbd>View</kbd> menu to change the text size.
+Right-to-left languages such as Arabic, Persian, Urdu, and Hebrew are displayed and edited right to left. The app follows the dark mode of your system. Use the <kbd>View</kbd> menu to change the text size.
 
 **Preferences** (<kbd>Edit</kbd> menu \> <kbd>Preferences...</kbd>)
 
