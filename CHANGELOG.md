@@ -1,6 +1,14 @@
 # Changelog
 
 
+## v0.4.5
+
+### Fixed
+
+- With an NVIDIA GPU and no CUDA 12 libraries (`cublas64_12.dll` on Windows), the translation failed with a message from the library. Now the app says which libraries are missing and where to get them (CUDA Toolkit 12.8 or 12.9; CUDA 13 does not have them, but it can stay installed next to CUDA 12), moves to the CPU, and asks you to translate again. Edit > Preferences disables the GPU choice until the libraries are found
+- On Windows, the app now looks for the newest CUDA 12 folder (`CUDA_PATH_V12_*` or the default install folder) when the libraries are not on the path. We could not test this on Windows, so please report what you see in an [issue](https://github.com/ymoslem/DesktopTranslator/issues)
+
+
 ## v0.4.4
 
 ### Fixed

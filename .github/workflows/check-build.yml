@@ -89,7 +89,7 @@ jobs:
 
       - name: Package the app
         run: |
-          VERSION="0.4.4-dev"
+          VERSION="0.4.5-dev"
           if [ "${{ matrix.name }}" = "macOS" ]; then
             ditto -c -k --keepParent dist/DesktopTranslator.app "DesktopTranslator_macOS_${VERSION}.zip"
           else

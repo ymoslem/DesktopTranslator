@@ -1,5 +1,5 @@
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.4-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.4/DesktopTranslator_Windows_0.4.4.exe)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.4-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.4/DesktopTranslator_macOS_0.4.4.zip)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.5-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.5/DesktopTranslator_Windows_0.4.5.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.5-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.5/DesktopTranslator_macOS_0.4.5.zip)
 
 # DesktopTranslator
 DesktopTranslator translates text and documents on your own computer. Nothing is sent to a server, and no internet connection is needed once you have a model. It runs [CTranslate2](https://github.com/OpenNMT/CTranslate2) models with SentencePiece, including the multilingual [NLLB-200](https://arxiv.org/abs/2207.04672) (200 languages) and [M2M-100](https://arxiv.org/abs/2010.11125) (100 languages) and bilingual models such as OPUS-MT.
@@ -32,8 +32,8 @@ DesktopTranslator translates text and documents on your own computer. Nothing is
     
 ## Download DesktopTranslator
    
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.4-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.4/DesktopTranslator_Windows_0.4.4.exe)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.4-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.4/DesktopTranslator_macOS_0.4.4.zip)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.5-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.5/DesktopTranslator_Windows_0.4.5.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.5-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.5/DesktopTranslator_macOS_0.4.5.zip)
 
 <img src="img/installer.png" width="497">
 
@@ -57,7 +57,7 @@ Right-to-left languages such as Arabic, Persian, Urdu, and Hebrew are displayed 
 |---|---|
 | Translation quality | Fast (beam size 2), Balanced (3, the default), or Thorough (5, slower) |
 | Speed on the CPU | Standard (8 sentences per batch), Faster (16), Fastest (32), or Automatic, which makes each batch as large as the speed of the computer allows in about 5 seconds. In our tests, Fastest was about 1.2 to 1.5 times as fast as Standard on five machines. Progress and Cancel update less often with larger batches, and with Automatic the same text can be translated a little differently from one run to another |
-| Run on | The CPU, or an NVIDIA GPU when one is found. It is tested on an RTX 5090 with Linux. CTranslate2 needs the NVIDIA driver and the [CUDA 12 libraries](https://opennmt.net/CTranslate2/installation.html) to use a GPU. If the option does not appear, CTranslate2 found no usable GPU, because the computer has none or the driver or the libraries are missing. We have not tested Windows yet, so please report what you see in an [issue](https://github.com/ymoslem/DesktopTranslator/issues) |
+| Run on | The CPU, or an NVIDIA GPU when one is found. It is tested on an RTX 5090 with Linux. CTranslate2 needs the NVIDIA driver and the CUDA 12 libraries to use a GPU, so install CUDA Toolkit 12.8 or 12.9 from the [CUDA Toolkit Archive](https://developer.nvidia.com/cuda-toolkit-archive). CUDA 13 does not have these libraries, but it can stay installed next to CUDA 12. If the option does not appear, CTranslate2 found no usable GPU, because the computer has none or the driver is missing. If the CUDA 12 libraries are missing, the option is disabled and its tooltip says what to install. We have not tested Windows yet, so please report what you see in an [issue](https://github.com/ymoslem/DesktopTranslator/issues) |
 | Avoid repeated words | A repetition penalty of 1.2, off by default because translations scored higher without it in tests (`tests/repetition_penalty_eval.py`) |
 | Join lines inside a paragraph | For text from PDF files or OCR, where lines break in the middle of a sentence |
 | Remember the last model and target language | Opens the same model the next time |
@@ -160,7 +160,7 @@ pyinstaller -y --windowed --name DesktopTranslator --add-data "utils;utils" --ad
 3. Try the `*.exe` file under "dist\DesktopTranslator" to make sure it works.
 4. Download and install [NSIS](https://nsis.sourceforge.io/Download), and then create the installer with the script [installer.nsi](installer.nsi). It installs the app to "Program Files", and adds Start menu and Desktop shortcuts and an uninstaller.
 ```
-makensis /DVERSION=0.4.4 installer.nsi
+makensis /DVERSION=0.4.5 installer.nsi
 ```
 
 If you prefer to create the installer with the NSIS graphical interface, you can follow these steps instead of step 4:
