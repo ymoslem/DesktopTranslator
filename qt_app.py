@@ -773,7 +773,12 @@ class Window(QMainWindow):
             if answer == QMessageBox.StandardButton.Yes:
                 QDesktopServices.openUrl(QUrl(url))
         else:
-            QMessageBox.information(self, "Check for Updates", "You have the latest version, " + VERSION + ".")
+            box = QMessageBox(self)  # the version on its own line, so that the message does not wrap in the middle
+            box.setIconPixmap(self.windowIcon().pixmap(64, 64))  # the icon of the app, as in About
+            box.setWindowTitle("Check for Updates")
+            box.setText("You have the latest version.")
+            box.setInformativeText("Version " + VERSION)
+            box.exec()
 
     def on_update_failed(self, message):
         self.say("")

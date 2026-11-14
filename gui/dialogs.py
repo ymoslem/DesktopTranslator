@@ -265,7 +265,9 @@ class DiagnosticsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Diagnostic Info")
         self.issues_url = issues_url
-        note = QLabel("Check this text before you share it. It has no text, file names, or paths. Paste it into your report of the issue.")
+        note = QLabel("This does not include private information: no text from your documents, no file names, and no paths. "
+                      "It does have the name of the model folder and the last error message, so check it before you share it, "
+                      "and paste it into your report of the issue.")
         note.setWordWrap(True)
         self.edit = QPlainTextEdit(text)
         self.edit.setMinimumSize(560, 360)

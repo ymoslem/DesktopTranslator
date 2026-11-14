@@ -851,8 +851,12 @@ check_updates_now()
 check(messages and messages[-1][0] == "Update available" and "9.9.9" in messages[-1][1] and opened_pages == ["https://example.org/releases/v9.9.9"]
       and LatestHandler.seen == ["DesktopTranslator/" + qt_app.VERSION], "a newer version is offered, and the page opens when the user agrees")
 latest["tag_name"] = "v" + qt_app.VERSION
+current_boxes = []
+real_box_exec = qt_app.QMessageBox.exec
+qt_app.QMessageBox.exec = lambda box: current_boxes.append((box.windowTitle(), box.text(), box.informativeText())) or 0
 check_updates_now()
-check(messages and messages[-1][0] == "Check for Updates" and "latest version" in messages[-1][1], "the latest version is said to be the latest")
+qt_app.QMessageBox.exec = real_box_exec
+check([box[1:] for box in current_boxes] == [("You have the latest version.", "Version " + qt_app.VERSION)], "the latest version is said to be the latest, with the version on its own line")
 latest_server.shutdown()
 latest_server.server_close()
 check_updates_now()
