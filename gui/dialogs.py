@@ -2,7 +2,10 @@
 import os
 import time
 
+from PySide6.QtCore import QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -11,6 +14,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QProgressBar,
+    QPlainTextEdit,
     QPushButton,
     QVBoxLayout,
     QWidget,
@@ -250,3 +254,36 @@ class PreferencesDialog(QDialog):
 
     def values(self):
         return QUALITY[self.quality.currentText()], self.join_lines.isChecked(), self.remember.isChecked(), self.repetition.isChecked()
+
+
+class DiagnosticsDialog(QDialog):
+    """Shows the information for a report of an issue, to check and change before it is copied"""
+
+    def __init__(self, parent, text, issues_url):
+        super().__init__(parent)
+        self.setWindowTitle("Diagnostic Info")
+        self.issues_url = issues_url
+        note = QLabel("Check this text before you share it. It has no text, file names, or paths. Paste it into your report of the issue.")
+        note.setWordWrap(True)
+        self.edit = QPlainTextEdit(text)
+        self.edit.setMinimumSize(560, 360)
+        self.status = QLabel("")
+        copy = QPushButton("Copy")
+        copy.setDefault(True)
+        copy.clicked.connect(self.copy)
+        report = QPushButton("Report an Issue...")
+        report.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(self.issues_url + "/new")))
+        close = QPushButton("Close")
+        close.clicked.connect(self.accept)
+        row = QHBoxLayout()
+        row.addWidget(self.status, 1)
+        for button in (copy, report, close):
+            row.addWidget(button)
+        layout = QVBoxLayout(self)
+        layout.addWidget(note)
+        layout.addWidget(self.edit)
+        layout.addLayout(row)
+
+    def copy(self):
+        QApplication.clipboard().setText(self.edit.toPlainText())
+        self.status.setText("Copied.")

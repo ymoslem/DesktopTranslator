@@ -67,6 +67,8 @@ Right-to-left languages such as Arabic, Persian, Urdu, and Hebrew are displayed 
 
 Each sentence is translated on its own, and a sentence that repeats is translated once and reused, so it is translated the same way everywhere.
 
+**Reporting an issue.** Choose <kbd>Help</kbd> menu \> <kbd>Copy Diagnostic Info...</kbd>, check the text, copy it, and paste it into a [new issue](https://github.com/ymoslem/DesktopTranslator/issues/new). It has the versions, the hardware, the settings, the name of the model folder, and the last error. It has no text, file names, or paths.
+
 **Memory.** Larger models need more memory. The app warns you if the computer may not have enough free memory for the model you open.
 
 

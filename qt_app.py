@@ -58,7 +58,8 @@ from gui.constants import (
     TARGET_PLACEHOLDER,
     VERSION,
 )
-from gui.dialogs import DocumentDialog, DownloadDialog, PreferencesDialog, WelcomeDialog
+from gui import diagnostics
+from gui.dialogs import DiagnosticsDialog, DocumentDialog, DownloadDialog, PreferencesDialog, WelcomeDialog
 from gui.helpers import short_text
 from gui.widgets import InfoSign, LanguageBox, SourceEdit
 from gui.workers import DocumentWorker, ModelDownloadWorker, Worker
@@ -73,6 +74,7 @@ class Window(QMainWindow):
         self.preferences = Preferences()
         self.engine.cpu_speed = self.preferences.get("cpu_speed", "standard")
         self.worker = None
+        self.last_error = None  # title and message of the last error shown, for the diagnostic info
         self.translation = ""
         self.file_name = ""
         self.pending_model = ""  # the models of the last session are loaded when translating
@@ -253,6 +255,7 @@ class Window(QMainWindow):
         help_menu = bar.addMenu("&Help")
         self.action(help_menu, "Download " + MODEL_DOWNLOAD["name"] + "...", self.download_first_model)
         self.action(help_menu, "Get Models...", self.show_models)
+        self.action(help_menu, "Copy Diagnostic Info...", self.show_diagnostics)
         self.action(help_menu, "Report an Issue...", lambda: QDesktopServices.openUrl(QUrl(ISSUES_URL)))
         about = self.action(help_menu, "About " + APP_NAME, self.show_about)
         about.setMenuRole(QAction.MenuRole.AboutRole)  # macOS moves it to the first place of the application menu
@@ -380,7 +383,7 @@ class Window(QMainWindow):
         try:
             changed = self.engine.load_model(model_dir, self.preferences.get("device", "cpu"))
         except EngineError as error:
-            QMessageBox.critical(self, error.title, error.message)
+            self.show_error(error.title, error.message)
             return False
         finally:
             QApplication.restoreOverrideCursor()
@@ -460,7 +463,7 @@ class Window(QMainWindow):
             dialog = DownloadDialog(self, ModelDownloadWorker())
             dialog.exec()
             if dialog.error:
-                QMessageBox.critical(self, dialog.error[0], dialog.error[1])
+                self.show_error(dialog.error[0], dialog.error[1])
                 self.say("The model could not be downloaded.")
                 return
             if dialog.folder is None:
@@ -510,10 +513,10 @@ class Window(QMainWindow):
         try:
             text, encoding = read_text_file(path, encoding)
         except EngineError as error:
-            QMessageBox.critical(self, error.title, error.message)
+            self.show_error(error.title, error.message)
             return
         except (LookupError, UnicodeError, OSError) as error:
-            QMessageBox.critical(self, "Cannot open the file", str(error))
+            self.show_error("Cannot open the file", str(error))
             return
         words = len(text.split())
         if words > WORD_LIMIT:
@@ -573,18 +576,18 @@ class Window(QMainWindow):
             self.offer_document(words)
             return
         if not self.ensure_loaded():
-            QMessageBox.critical(self, "No model", "Please open a model first (Translate > Open Model).")
+            self.show_error("No model", "Please open a model first (Translate > Open Model).")
             return
         try:
             target = self.engine.target_language(self.selected_target())
         except EngineError as error:
-            QMessageBox.critical(self, error.title, error.message)
+            self.show_error(error.title, error.message)
             return
         source = self.selected_source()
         source_code, prefix = self.engine.source_language(text, source)
         if source_code is None:
-            QMessageBox.critical(
-                self, "Source language",
+            self.show_error(
+                "Source language",
                 "The source language is not supported or not recognized. Add more text, or select the source language.",
             )
             return
@@ -684,12 +687,12 @@ class Window(QMainWindow):
         if self.worker is not None:
             return
         if not self.ensure_loaded():
-            QMessageBox.critical(self, "No model", "Please open a model first (Translate > Open Model).")
+            self.show_error("No model", "Please open a model first (Translate > Open Model).")
             return
         try:
             target = self.engine.target_language(self.selected_target())
         except EngineError as error:
-            QMessageBox.critical(self, error.title, error.message)
+            self.show_error(error.title, error.message)
             return
         if not path:
             path, _ = QFileDialog.getOpenFileName(self, "Open the text file to translate", os.path.dirname(self.file_name), "Text files (*.txt);;All files (*)")
@@ -700,7 +703,7 @@ class Window(QMainWindow):
         if not output:
             return
         if os.path.abspath(output) == os.path.abspath(path):
-            QMessageBox.critical(self, "Translate Document", "Please choose a different file for the translation.")
+            self.show_error("Translate Document", "Please choose a different file for the translation.")
             return
         penalty = REPETITION_PENALTY if self.preferences.get("repetition_penalty", 1.0) > 1.0 else 1.0
         worker = DocumentWorker(
@@ -714,7 +717,7 @@ class Window(QMainWindow):
         elif dialog.outcome == "cancelled":
             self.say("Cancelled. The translated part is saved in " + output)
         else:
-            QMessageBox.critical(self, "Translate Document", dialog.outcome)
+            self.show_error("Translate Document", dialog.outcome)
             self.say("Translating the document failed.")
 
     # Windows
@@ -748,6 +751,16 @@ class Window(QMainWindow):
             self.say("The device changes when a model is opened.")
         elif self.engine.translator is not None and not self.load_model(self.engine.model_dir):
             self.preferences.set("device", previous)  # the model did not fit on the GPU; the CPU model is still loaded
+
+    def show_error(self, title, message):
+        """Show an error, and keep it for the diagnostic info"""
+        self.last_error = (title, message)
+        QMessageBox.critical(self, title, message)
+
+    def show_diagnostics(self):
+        info = diagnostics.collect(APP_NAME, VERSION, self.engine, self.preferences.data, self.selected_source(),
+                                   self.selected_target(), self.last_error)
+        DiagnosticsDialog(self, diagnostics.to_markdown(info), ISSUES_URL).exec()
 
     def show_models(self):
         dialog = QDialog(self)

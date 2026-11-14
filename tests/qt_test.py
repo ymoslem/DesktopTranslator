@@ -733,6 +733,30 @@ check(lid_window.source_header.text() == "Source (detected: Hungarian, 1 word)" 
       and "57% sure" in lid_window.detection_info.toolTip(), "an unsure detection of one word has an (i) sign with the confidence")
 lid_window.close()
 
+# The diagnostic info for a report of an issue
+help_items = [a.text() for a in window.menuBar().actions()[-1].menu().actions()]
+check("Copy Diagnostic Info..." in help_items, "the Help menu has Copy Diagnostic Info")
+diag_window = qt_app.Window()
+diag_window.load_model(NLLB)
+diag_window.source_text.setPlainText("A very private sentence about SECRETWORD9917.")
+home = os.path.expanduser("~")
+messages.clear()
+diag_window.show_error("Cannot open the file", "Cannot read " + home + "/Documents/private.txt")
+check(diag_window.last_error == ("Cannot open the file", "Cannot read " + home + "/Documents/private.txt") and messages, "the last error is remembered and shown")
+shown_dialogs = []
+real_diag_exec = qt_app.DiagnosticsDialog.exec
+qt_app.DiagnosticsDialog.exec = lambda dialog: shown_dialogs.append(dialog) or 0
+diag_window.show_diagnostics()
+qt_app.DiagnosticsDialog.exec = real_diag_exec
+report = shown_dialogs[0].edit.toPlainText()
+check("nllb-200-distilled-600M-int8" in report and "CTranslate2 " in report and "Running on: cpu" in report and "cpu_speed: standard" in report and "beam_size: " in report,
+      "the diagnostic info has the versions, the model folder name, and the settings")
+check(NLLB not in report and home not in report and "SECRETWORD9917" not in report and "private.txt" in report and "~/Documents/private.txt" in report,
+      "the diagnostic info has no model path, home folder, or text")
+shown_dialogs[0].copy()
+check(qt_app.QApplication.clipboard().text() == report and shown_dialogs[0].edit.isReadOnly() is False, "the diagnostic info can be changed, and it is copied")
+diag_window.close()
+
 # The device in the Preferences
 count_boxes = lambda dialog: len(dialog.findChildren(QComboBox))
 check(count_boxes(qt_app.PreferencesDialog(window, 3, False, True, False)) == 2
