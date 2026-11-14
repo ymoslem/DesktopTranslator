@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from engine import MODEL_DOWNLOAD, format_duration
-from gui.constants import APP_NAME, DEFAULT_QUALITY, DEVICES, QUALITY
+from gui.constants import APP_NAME, CPU_SPEEDS, DEFAULT_QUALITY, DEVICES, QUALITY
 from gui.widgets import InfoSign
 
 
@@ -194,13 +194,16 @@ def with_info(widget, text):
 
 
 class PreferencesDialog(QDialog):
-    def __init__(self, parent, beam_size, join_lines, remember, repetition, device="cpu", gpu=False, load_at_start=True):
+    def __init__(self, parent, beam_size, join_lines, remember, repetition, device="cpu", gpu=False, load_at_start=True, cpu_speed="standard"):
         super().__init__(parent)
         self.setWindowTitle("Preferences")
         self.gpu = gpu  # an NVIDIA GPU is available, so the device can be chosen
         self.device_box = QComboBox()
         self.device_box.addItems(DEVICES)
         self.device_box.setCurrentText(DEVICES[1] if device == "cuda" and gpu else DEVICES[0])
+        self.speed_box = QComboBox()
+        self.speed_box.addItems(CPU_SPEEDS)
+        self.speed_box.setCurrentText(next((name for name, key in CPU_SPEEDS.items() if key == cpu_speed), "Standard"))
         self.quality = QComboBox()
         self.quality.addItems(QUALITY)
         self.quality.setCurrentText(next((n for n, b in QUALITY.items() if b == beam_size), DEFAULT_QUALITY))
@@ -218,6 +221,9 @@ class PreferencesDialog(QDialog):
         form.addRow("Translation quality:", with_info(
             self.quality, "A larger beam size searches more candidate translations and takes longer. "
                           "In our tests, beam size 1 was clearly worse than 3, and beam size 5 was not clearly better."))
+        form.addRow("Speed on the CPU:", with_info(
+            self.speed_box, "Larger batches make translation on the CPU faster, and progress and Cancel update less often. "
+                            "In our tests, Fastest was about 1.2 to 1.5 times as fast as Standard."))
         if gpu:
             form.addRow("Run on:", with_info(
                 self.device_box, "GPU can be faster than the CPU, if its memory is large enough for the model. "
@@ -237,6 +243,10 @@ class PreferencesDialog(QDialog):
     def device(self):
         """The device to use, cuda or cpu"""
         return "cuda" if self.gpu and self.device_box.currentText() == DEVICES[1] else "cpu"
+
+    def cpu_speed(self):
+        """The level of the speed on the CPU, a key of engine.CPU_SENTENCES"""
+        return CPU_SPEEDS[self.speed_box.currentText()]
 
     def values(self):
         return QUALITY[self.quality.currentText()], self.join_lines.isChecked(), self.remember.isChecked(), self.repetition.isChecked()

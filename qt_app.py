@@ -71,6 +71,7 @@ class Window(QMainWindow):
         self.setWindowTitle(APP_NAME)
         self.engine = Engine()
         self.preferences = Preferences()
+        self.engine.cpu_speed = self.preferences.get("cpu_speed", "standard")
         self.worker = None
         self.translation = ""
         self.file_name = ""
@@ -723,10 +724,13 @@ class Window(QMainWindow):
             self, self.preferences.get("beam_size", 3), self.preferences.get("join_lines", False),
             self.preferences.get("remember_model_paths", True), self.preferences.get("repetition_penalty", 1.0) > 1.0,
             self.preferences.get("device", "cpu"), gpu_count() > 0, self.preferences.get("load_at_start", True),
+            self.preferences.get("cpu_speed", "standard"),
         )
         if dialog.exec():
             beam_size, join_lines, remember, repetition = dialog.values()
             self.preferences.set("load_at_start", dialog.load_at_start.isChecked())
+            self.preferences.set("cpu_speed", dialog.cpu_speed())
+            self.engine.cpu_speed = dialog.cpu_speed()
             self.change_device(dialog.device())
             self.preferences.set("repetition_penalty", REPETITION_PENALTY if repetition else 1.0)
             self.preferences.set("beam_size", beam_size)

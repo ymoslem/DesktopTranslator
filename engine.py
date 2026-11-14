@@ -29,6 +29,10 @@ MAX_BATCH_TOKENS = 1024  # CTranslate2 splits a call into batches of at most thi
 # On a GPU, larger calls are faster: about 4 times the speed of the CPU settings with NLLB-200 600M on an RTX 5090, with chrF++ within 0.05
 # (see tests/gpu_batch_eval.py and tests/gpu_batch_quality.py). A call ends at the first of the two limits, counted in tokens of the source.
 GPU_BATCH_SENTENCES = 128
+# On the CPU, larger calls are about 1.2 to 1.5 times as fast on the machines we tested, and progress and Cancel then update less often
+# (see tests/cpu_threads_eval.py). The user chooses the level; a call also ends at 40 tokens per sentence of its limit.
+CPU_SENTENCES = {"standard": BATCH_SENTENCES, "faster": 16, "fastest": 32}
+TOKENS_PER_SENTENCE = 40
 GPU_BATCH_TOKENS = 4096
 MIN_BATCH_TOKENS = 128  # the smallest limit after the memory of the GPU runs out
 DOCUMENT_LINES = 200  # lines of a document that are split and translated together
@@ -356,6 +360,7 @@ class Engine:
         self.translator = None
         self.device = "cpu"  # "cuda" when the model runs on an NVIDIA GPU
         self.compute_type = ""  # the type a model on a GPU runs as; the CPU keeps the type of the files
+        self.cpu_speed = "standard"  # the level of the sentences per call on the CPU, a key of CPU_SENTENCES
         # Overrides of the limits of a call (see limits), for tests and for the memory of a GPU; None uses the defaults
         self.batch_sentences = self.call_tokens = self.max_batch_tokens = None
         self.sp_model = None
@@ -482,8 +487,12 @@ class Engine:
     def limits(self):
         """Sentences per call, tokens per call (None for no limit), and tokens per CTranslate2 batch, for the device in use"""
         gpu = self.device == "cuda"
-        sentences = self.batch_sentences or (GPU_BATCH_SENTENCES if gpu else BATCH_SENTENCES)
-        call_tokens = (GPU_BATCH_TOKENS if gpu else None) if self.call_tokens is None else (self.call_tokens or None)
+        if gpu:
+            sentences, default_tokens = self.batch_sentences or GPU_BATCH_SENTENCES, GPU_BATCH_TOKENS
+        else:
+            sentences = self.batch_sentences or CPU_SENTENCES.get(self.cpu_speed, BATCH_SENTENCES)
+            default_tokens = TOKENS_PER_SENTENCE * sentences
+        call_tokens = default_tokens if self.call_tokens is None else (self.call_tokens or None)
         return sentences, call_tokens, self.max_batch_tokens or (GPU_BATCH_TOKENS if gpu else MAX_BATCH_TOKENS)
 
     def split(self, text, source_lang_code, join=False):

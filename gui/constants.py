@@ -5,6 +5,7 @@ VERSION = "0.4.2"
 TARGET_PLACEHOLDER = "Select a language..."
 DEFAULT_TEXT_SIZE = 14
 DEVICES = ["CPU", "GPU (NVIDIA)"]
+CPU_SPEEDS = {"Standard": "standard", "Faster": "faster", "Fastest": "fastest"}  # name: key of engine.CPU_SENTENCES
 QUALITY = {"Fast (beam size 2)": 2, "Balanced (beam size 3)": 3, "Thorough (beam size 5)": 5}  # name: beam size
 DEFAULT_QUALITY = "Balanced (beam size 3)"
 REPOSITORY_URL = "https://github.com/ymoslem/DesktopTranslator"  # shown in About; a website can be added later

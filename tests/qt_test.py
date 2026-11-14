@@ -647,6 +647,30 @@ cpu_engine.call_tokens = 5
 check(all(len(b) == 1 for b in cpu_engine.split(text, "en")[2]), "a sentence over the limit of tokens is a call of its own")
 cpu_engine.device = "cpu"
 
+# The speed levels on the CPU: 8, 16 or 32 sentences per call, and no more than 40 tokens per sentence of the limit
+cpu_engine.batch_sentences = cpu_engine.call_tokens = cpu_engine.max_batch_tokens = None  # the earlier checks set limits by hand
+check(cpu_engine.cpu_speed == "standard", "the speed on the CPU is Standard by default")
+for level, number in (("faster", 16), ("fastest", 32)):
+    cpu_engine.cpu_speed = level
+    check(set(sizes(cpu_engine.split(text, "en")[2])[:-1]) == {number}, "%s: the CPU translates %d sentences per call" % (level, number))
+cpu_engine.cpu_speed = "fastest"
+long_text = "\n".join(("This is a long sentence number %d, " % i) + "with many words, " * 12 + "that ends here." for i in range(40))
+long_tokens = len(cpu_engine.sp_model.encode(long_text.split("\n")[0], out_type=str)) + 2
+per_call = [len(b) for b in cpu_engine.split(long_text, "en")[2]]
+check(long_tokens > 40 and max(per_call) <= max(1, (40 * 32) // long_tokens) and sum(per_call) == 40,
+      "long sentences make smaller calls: %d tokens each, at most %d per call" % (long_tokens, max(per_call)))
+cpu_engine.cpu_speed = "standard"
+speed_dialog = qt_app.PreferencesDialog(window, 3, False, True, False, cpu_speed="fastest")
+check(speed_dialog.cpu_speed() == "fastest" and qt_app.PreferencesDialog(window, 3, False, True, False).cpu_speed() == "standard",
+      "the Preferences show the speed on the CPU, Standard by default")
+window.preferences.set("cpu_speed", "faster")
+window.save_settings()
+speed_window = qt_app.Window()
+check(speed_window.engine.cpu_speed == "faster", "the speed on the CPU is restored at the next start")
+speed_window.close()
+window.preferences.set("cpu_speed", "standard")
+window.save_settings()
+
 # When the memory of the GPU runs out during a translation, the batches become smaller
 
 
@@ -711,13 +735,13 @@ lid_window.close()
 
 # The device in the Preferences
 count_boxes = lambda dialog: len(dialog.findChildren(QComboBox))
-check(count_boxes(qt_app.PreferencesDialog(window, 3, False, True, False)) == 1
+check(count_boxes(qt_app.PreferencesDialog(window, 3, False, True, False)) == 2
       and qt_app.PreferencesDialog(window, 3, False, True, False, "cuda", False).device() == "cpu", "without a GPU, the Preferences offer no device")
 with_gpu = qt_app.PreferencesDialog(window, 3, False, True, False, "cuda", True)
-check(count_boxes(with_gpu) == 2 and with_gpu.device() == "cuda", "with a GPU, the Preferences show the device in use")
+check(count_boxes(with_gpu) == 3 and with_gpu.device() == "cuda", "with a GPU, the Preferences show the device in use")
 signs = with_gpu.findChildren(gui.widgets.InfoSign)
 signs[0].enterEvent(QEnterEvent(QPointF(1, 1), QPointF(1, 1), QPointF(1, 1)))
-check(len(signs) == 6 and QToolTip.isVisible() and QToolTip.text() == signs[0].toolTip(), "an (i) sign shows its tooltip at once")
+check(len(signs) == 7 and QToolTip.isVisible() and QToolTip.text() == signs[0].toolTip(), "an (i) sign shows its tooltip at once")
 check(all(". " not in sign.toolTip() for sign in signs) and signs[0].toolTip().count("\n") == 1, "the tooltip of an (i) sign has a line for each sentence")
 QToolTip.hideText()
 with_gpu.device_box.setCurrentText("CPU")
