@@ -1,6 +1,13 @@
 # Changelog
 
 
+## Unreleased
+
+### Added
+
+- Help > Get Models... downloads and opens the NLLB-200 600M and 1.3B models inside the app, with progress, cancel and a checksum check. Other models still open in the browser
+
+
 ## v0.4.5
 
 ### Fixed
