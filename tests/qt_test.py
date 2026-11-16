@@ -514,8 +514,8 @@ choice.update(value="download", skip=False)
 downloads = []
 
 
-def fake_download(is_cancelled=None, on_progress=None):
-    downloads.append(1)
+def fake_download(info=None, is_cancelled=None, on_progress=None):
+    downloads.append(info)
     on_progress(5e6, 10e6)
     return FREN + "/ct2_model"
 
@@ -527,15 +527,54 @@ check(downloads and fresh.engine.model_dir == FREN + "/ct2_model" and fresh.engi
 with open(SETTINGS_FILE, "w", encoding="utf-8") as file:
     json.dump({}, file)
 fresh = qt_app.Window()
-gui.workers.download_model = lambda is_cancelled=None, on_progress=None: (_ for _ in ()).throw(engine_module.EngineError("Download failed", "No Internet"))
+gui.workers.download_model = lambda info=None, is_cancelled=None, on_progress=None: (_ for _ in ()).throw(engine_module.EngineError("Download failed", "No Internet"))
 messages.clear()
 fresh.offer_first_model()
 check(messages and messages[-1] == ("Download failed", "No Internet") and fresh.engine.translator is None, "a failed download is explained")
-gui.workers.download_model = lambda is_cancelled=None, on_progress=None: None
+gui.workers.download_model = lambda info=None, is_cancelled=None, on_progress=None: None
 fresh.offer_first_model()
 check("cancelled" in fresh.status_label.text() and fresh.engine.translator is None, "a cancelled download is said so")
 texts = lambda downloaded: [b.text() for b in qt_app.WelcomeDialog(fresh, downloaded).findChildren(qt_app.QPushButton)]
 check(texts(False)[0].startswith("Download ") and texts(True)[0].startswith("Use "), "the first button downloads the model, or uses the one that is already there")
+
+# Get Models: the NLLB-200 models download inside the app, the others open the browser
+check(engine_module.MODEL_DOWNLOADS[0] is engine_module.MODEL_DOWNLOAD
+      and len({info["folder"] for info in engine_module.MODEL_DOWNLOADS}) == len(engine_module.MODEL_DOWNLOADS)
+      and all(len(info["sha256"]) == 64 and info["size"] > 0 for info in engine_module.MODEL_DOWNLOADS),
+      "the models of the app have their own folders and checksums")
+shown_buttons, opened_urls = [], []
+real_exec, real_open_url = qt_app.QDialog.exec, qt_app.QDesktopServices.openUrl
+clicks = {"index": 1}
+
+
+def fake_models_exec(self):
+    buttons = self.findChildren(qt_app.QPushButton)
+    shown_buttons.append([b.text() for b in buttons])
+    buttons[clicks["index"]].click()
+    return 0
+
+
+qt_app.QDialog.exec = fake_models_exec
+qt_app.QDesktopServices.openUrl = staticmethod(lambda url: opened_urls.append(url.toString()))
+downloads.clear()
+gui.workers.download_model = lambda info=None, is_cancelled=None, on_progress=None: (downloads.append(info), FREN + "/ct2_model")[1]
+fresh.show_models()
+check(shown_buttons[-1][:2] == ["Download", "Download"] and len(downloads) == 1 and downloads[0]["name"] == "NLLB-200 distilled 1.3B" and not opened_urls,
+      "Get Models downloads the 1.3B model inside the app")
+check(fresh.engine.model_dir == FREN + "/ct2_model", "and opens it")
+clicks["index"] = 2
+fresh.show_models()
+check(len(downloads) == 1 and len(opened_urls) == 1 and opened_urls[0].endswith("M2M-100_418m_parameter_model_ct2.zip"),
+      "Get Models opens the browser for a model that does not download in the app")
+folder_13b = os.path.join(engine_module.models_dir(), engine_module.MODEL_DOWNLOADS[1]["folder"])
+os.makedirs(engine_module.models_dir(), exist_ok=True)
+os.symlink(NLLB, folder_13b)  # stands in for a downloaded model
+clicks["index"] = 1
+downloads.clear()
+fresh.show_models()
+check(shown_buttons[-1][:2] == ["Download", "Open"] and not downloads and fresh.engine.model_dir == folder_13b,
+      "a model that is already downloaded shows Open, and opens without downloading")
+qt_app.QDialog.exec, qt_app.QDesktopServices.openUrl = real_exec, real_open_url
 fresh.close()
 
 # GPU selection, with CTranslate2 replaced, because the test machine may have no NVIDIA GPU

@@ -1,7 +1,7 @@
 """Background threads, so that translating, downloading and checking for updates do not freeze the window"""
 from PySide6.QtCore import QThread, Signal
 
-from engine import EngineError, download_model
+from engine import MODEL_DOWNLOAD, EngineError, download_model
 from gui import updates
 
 
@@ -59,19 +59,20 @@ class DocumentWorker(QThread):
 
 
 class ModelDownloadWorker(QThread):
-    """Downloads the model that the app offers, in the background"""
+    """Downloads one of the models that the app offers, in the background"""
 
     progress = Signal(float, float)
     finished_ok = Signal(object)  # the model folder, or None if cancelled
     failed = Signal(str, str)
 
-    def __init__(self):
+    def __init__(self, info=MODEL_DOWNLOAD):
         super().__init__()
+        self.info = info
         self.cancel = False
 
     def run(self):
         try:
-            folder = download_model(is_cancelled=lambda: self.cancel, on_progress=self.progress.emit)
+            folder = download_model(self.info, is_cancelled=lambda: self.cancel, on_progress=self.progress.emit)
             self.finished_ok.emit(folder)
         except EngineError as error:
             self.failed.emit(error.title, error.message)

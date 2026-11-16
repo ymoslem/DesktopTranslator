@@ -55,6 +55,18 @@ MODEL_DOWNLOAD = {
     "folder": "nllb-200-distilled-600M-int8",
 }
 
+# The models that the app downloads from Get Models; the first is the model of the welcome dialog
+MODEL_DOWNLOADS = [
+    MODEL_DOWNLOAD,
+    {
+        "name": "NLLB-200 distilled 1.3B",
+        "url": "https://github.com/ymoslem/DesktopTranslator/releases/download/models/NLLB-200_distilled_1.3B_int8_ct2.zip",
+        "sha256": "6021a252d77a69dd5a3f82bb7c2afa809a8c88cfa6c90e13327f5e782a6e2dc9",
+        "size": 1282658273,
+        "folder": "nllb-200-distilled-1.3B-int8",
+    },
+]
+
 # The folder with the program files, also when the app is packaged
 DATA_DIR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
 

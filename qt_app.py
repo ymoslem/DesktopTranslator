@@ -33,6 +33,7 @@ from engine import (
     LID_CONFIDENCE,
     LONG_LINE_CHARS,
     MODEL_DOWNLOAD,
+    MODEL_DOWNLOADS,
     REPETITION_PENALTY,
     WORD_LIMIT,
     Engine,
@@ -463,11 +464,11 @@ class Window(QMainWindow):
         elif dialog.choice == "open":
             self.open_model()
 
-    def download_first_model(self):
-        """Download the model of the welcome dialog, unless it is there, and open it"""
-        folder = downloaded_model()
+    def download_first_model(self, info=MODEL_DOWNLOAD):
+        """Download a model of the app (by default the one of the welcome dialog), unless it is there, and open it"""
+        folder = downloaded_model(info)
         if folder is None:
-            dialog = DownloadDialog(self, ModelDownloadWorker())
+            dialog = DownloadDialog(self, ModelDownloadWorker(info))
             dialog.exec()
             if dialog.error:
                 self.show_error(dialog.error[0], dialog.error[1])
@@ -821,11 +822,17 @@ class Window(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle("Get Models")
         layout = QVBoxLayout(dialog)
-        layout.addWidget(QLabel("Download a model, extract the archive, and open its folder with Translate > Open Model."))
+        layout.addWidget(QLabel("The NLLB-200 models download and open here. For the others, download the archive, extract it, and open its folder with Translate > Open Model."))
+        in_app = {info["url"]: info for info in MODEL_DOWNLOADS}
         for name, description, url in DOWNLOADS:
             row = QHBoxLayout()
-            button = QPushButton("Download")
-            button.clicked.connect(lambda _=False, url=url: QDesktopServices.openUrl(QUrl(url)))
+            info = in_app.get(url)
+            if info:
+                button = QPushButton("Open" if downloaded_model(info) else "Download")
+                button.clicked.connect(lambda _=False, info=info: (dialog.accept(), self.download_first_model(info)))
+            else:
+                button = QPushButton("Download")
+                button.clicked.connect(lambda _=False, url=url: QDesktopServices.openUrl(QUrl(url)))
             row.addWidget(QLabel("<b>" + name + "</b><br>" + description), 1)
             row.addWidget(button)
             layout.addLayout(row)

@@ -34,7 +34,7 @@ class DownloadDialog(QDialog):
         self.worker = worker
         self.folder = None  # the model folder when it is downloaded
         self.error = None  # title and message of a failure
-        self.label = QLabel("Downloading " + MODEL_DOWNLOAD["name"] + "...")
+        self.label = QLabel("Downloading " + worker.info["name"] + "...")
         self.bar = QProgressBar()
         self.bar.setRange(0, 0)  # until the download starts
         self.detail = QLabel("")
