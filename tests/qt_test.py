@@ -417,6 +417,30 @@ qt_app.memory_warning = real_warning
 starter.load_last_model()
 check(starter.engine.translator is not None and starter.engine.sp_model is not None and not starter.pending_model, "the last model is loaded at the start")
 starter.close()
+
+# A saved SentencePiece path that no longer exists
+with open(SETTINGS_FILE, encoding="utf-8") as file:
+    moved = json.load(file)
+moved["sp_model"] = os.path.join(FOLDER, "moved", "sentencepiece.model")
+with open(SETTINGS_FILE, "w", encoding="utf-8") as file:
+    json.dump(moved, file)
+lost = qt_app.Window()
+lost.load_last_model()
+check(lost.engine.sp_model is not None and lost.sp_path.startswith(NLLB), "a saved SentencePiece file that is gone is searched for again in the model folders")
+lost.close()
+moved.update(ct2_model=FREN + "/ct2_model", sp_model=os.path.join(FOLDER, "moved", "fr.model"))
+with open(SETTINGS_FILE, "w", encoding="utf-8") as file:
+    json.dump(moved, file)
+lost = qt_app.Window()
+lost.load_last_model()
+messages.clear()
+lost.source_text.setPlainText("Hello")
+lost.translate_or_cancel()
+check(lost.engine.translator is not None and lost.engine.sp_model is None and messages and messages[-1][0] == "No SentencePiece model",
+      "when several SentencePiece files are found and the saved one is gone, translating says the SentencePiece model is missing, not the model")
+lost.close()
+with open(SETTINGS_FILE, "w", encoding="utf-8") as file:
+    json.dump(saved_settings, file)
 window.close()
 
 # Downloading a model: the engine, with a local server

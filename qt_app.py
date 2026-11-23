@@ -437,6 +437,16 @@ class Window(QMainWindow):
             self.say("Last used model: " + short_text(os.path.basename(model_dir), 50) + " (loaded when you click Translate)")
         if os.path.isfile(sp_path):
             self.pending_sp = sp_path
+        elif self.pending_model:  # the saved file was moved or deleted, so look for the SentencePiece model again
+            found = find_sentencepiece(self.pending_model)
+            if len(found) == 1:
+                self.pending_sp = found[0]
+
+    def explain_missing_model(self):
+        if self.engine.translator is not None:  # the model is open, but its SentencePiece model was not found
+            self.show_error("No SentencePiece model", "The model is open, but its SentencePiece model was not found. Please choose it (Translate > Choose SentencePiece Model).")
+        else:
+            self.show_error("No model", "Please open a model first (Translate > Open Model).")
 
     def load_last_model(self):
         """At the start, load the model of the last session if the preferences say so; a model that may not fit in memory waits"""
@@ -584,7 +594,7 @@ class Window(QMainWindow):
             self.offer_document(words)
             return
         if not self.ensure_loaded():
-            self.show_error("No model", "Please open a model first (Translate > Open Model).")
+            self.explain_missing_model()
             return
         try:
             target = self.engine.target_language(self.selected_target())
@@ -710,7 +720,7 @@ class Window(QMainWindow):
         if self.worker is not None:
             return
         if not self.ensure_loaded():
-            self.show_error("No model", "Please open a model first (Translate > Open Model).")
+            self.explain_missing_model()
             return
         try:
             target = self.engine.target_language(self.selected_target())
