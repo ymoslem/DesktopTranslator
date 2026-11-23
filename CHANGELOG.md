@@ -6,6 +6,7 @@
 ### Added
 
 - Help > Get Models... downloads and opens the NLLB-200 600M and 1.3B models inside the app, with progress, cancel and a checksum check. Other models still open in the browser
+- Translate > Open Argos Package... opens an Argos Translate package (`.argosmodel`), also when you drop it on the text area. The app extracts the model and shows the two languages of the package in the From and To boxes
 
 
 ## v0.4.5

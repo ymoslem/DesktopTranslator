@@ -23,6 +23,7 @@ DesktopTranslator translates text and documents on your own computer. Nothing is
     * [NLLB-200 Multilingual Model](#nllb-200-multilingual-model)
     * [M2M-100 Multilingual Model](#m2m-100-multilingual-model)
     * [OPUS Models](#opus-models)
+    * [Argos Translate Models](#argos-translate-models)
     * [French-to-English Generic Model](#french-to-english-generic-model)
 1. [[Optional] Build Stand-alone Executable](#build-stand-alone-executable)
    * [Build Windows Installer](#build-windows-installer)
@@ -129,6 +130,16 @@ OPUS models ([Tatoeba-Challenge](https://github.com/Helsinki-NLP/Tatoeba-Challen
 ct2-opus-mt-converter --model_dir opus_model_dir --output_dir ct2_model_dir --quantization int8
 ```
 The source and target tokenization SentencePiece models can be found in the same archive of the downloaded model.
+
+
+### Argos Translate Models
+
+[Argos Translate](https://github.com/argosopentech/argos-translate) packages contain CTranslate2 models, each for one language direction. You can find them in the [Argos Translate package index](https://www.argosopentech.com/argospm/index/). DesktopTranslator does not distribute these models, and each package has its own license, so read the README inside a package before you use it.
+1. Download a package, a file with the extension `.argosmodel`, from the index.
+2. In DesktopTranslator, choose <kbd>Translate</kbd> menu \> <kbd>Open Argos Package...</kbd>, or drop the file on the left text area. The app extracts the model into its models folder and opens it.
+3. The <kbd>From</kbd> and <kbd>To</kbd> boxes show the two languages of the package. Type or open your text, and click <kbd>Translate</kbd>.
+
+Quality differs between packages and language pairs, so try a package on your own texts first. To extract a package yourself, rename the file to `.zip`, unzip it, and open its `model` folder with <kbd>Open Model...</kbd>. The SentencePiece model is found in the folder above it.
 
 
 ### French-to-English Generic Model
