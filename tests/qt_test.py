@@ -599,6 +599,62 @@ fresh.show_models()
 check(shown_buttons[-1][:2] == ["Download", "Open"] and not downloads and fresh.engine.model_dir == folder_13b,
       "a model that is already downloaded shows Open, and opens without downloading")
 qt_app.QDialog.exec, qt_app.QDesktopServices.openUrl = real_exec, real_open_url
+
+# Argos Translate packages (.argosmodel): a zip with a folder that holds the model, the SentencePiece model, and metadata
+import zipfile
+
+
+def make_package(path, root="translate-fr_en-1_0", model=True, extra=(), names=("French", "English")):
+    with zipfile.ZipFile(path, "w") as archive:
+        if model:
+            for name in os.listdir(FREN + "/ct2_model"):
+                archive.write(os.path.join(FREN, "ct2_model", name), root + "/model/" + name)
+        archive.write(os.path.join(FREN, "sp_model", "fr.model"), root + "/sentencepiece.model")
+        archive.writestr(root + "/metadata.json", json.dumps({"from_name": names[0], "to_name": names[1], "from_code": "fr", "to_code": "en"}))
+        archive.writestr(root + "/stanza/resources.json", "{}")
+        for name in extra:
+            archive.writestr(name, "x")
+
+
+package = os.path.join(FOLDER, "translate-fr_en-1_0.argosmodel")
+make_package(package)
+model_folder = engine_module.extract_argos_package(package)
+extracted = os.path.dirname(model_folder)
+check(os.path.isfile(os.path.join(model_folder, "model.bin")) and os.path.isfile(os.path.join(extracted, "sentencepiece.model"))
+      and os.path.isfile(os.path.join(extracted, "metadata.json")) and not os.path.exists(os.path.join(extracted, "stanza")),
+      "an Argos package is extracted to the models folder without the Stanza sentence splitter")
+check(engine_module.package_languages(model_folder) == ("French", "English") and engine_module.find_sentencepiece(model_folder) == [os.path.join(extracted, "sentencepiece.model")],
+      "its languages and SentencePiece model are found from the model folder")
+before = os.path.getmtime(os.path.join(model_folder, "model.bin"))
+check(engine_module.extract_argos_package(package) == model_folder and os.path.getmtime(os.path.join(model_folder, "model.bin")) == before,
+      "a package that was extracted before is not extracted again")
+unsafe, empty, twice = (os.path.join(FOLDER, name + ".argosmodel") for name in ("unsafe", "empty", "twice"))
+make_package(unsafe, extra=("translate-fr_en-1_0/model/../../outside.txt",))
+make_package(empty, model=False)
+with zipfile.ZipFile(twice, "w") as archive:
+    archive.writestr("one/metadata.json", "{}")
+    archive.writestr("two/sentencepiece.model", "x")
+for bad, reason in ((unsafe, "a file name that is not safe"), (empty, "a package without a model"), (twice, "a package with two folders"), (os.path.join(FOLDER, "missing.argosmodel"), "a missing file")):
+    try:
+        engine_module.extract_argos_package(bad)
+        check(False, reason + " is refused")
+    except engine_module.EngineError as error:
+        check(error.title in ("Not an Argos package", "Cannot open the package") and not os.path.exists(os.path.join(engine_module.models_dir(), "outside.txt")), reason + " is refused: " + error.title)
+argos = qt_app.Window()
+argos.open_text_file(package)  # what dropping the file on the source pane does
+check(argos.engine.translator is not None and argos.engine.sp_model is not None and argos.engine.model_dir == model_folder, "a dropped Argos package is extracted and opened")
+check((argos.source_combo.currentText(), argos.target_combo.currentText()) == ("French", "English") and not argos.source_combo.isEnabled() and not argos.target_combo.isEnabled(),
+      "the languages of the package are shown, and cannot be changed")
+check(argos.model_label.text().startswith("Model: French to English"), "the model is named by its languages, not by the folder called model")
+check("Open Argos Package..." in [a.text() for menu in argos.menuBar().actions() if menu.menu() for a in menu.menu().actions()], "the Translate menu has Open Argos Package")
+messages.clear()
+argos.open_text_file(unsafe)
+check(messages and messages[-1][0] == "Not an Argos package" and argos.engine.model_dir == model_folder, "a file that is not a package is explained, and the open model stays")
+argos.close()
+argos = qt_app.Window()
+check((argos.source_combo.currentText(), argos.target_combo.currentText()) == ("French", "English") and argos.engine.translator is None,
+      "the next session shows the languages of the last Argos package")
+argos.close()
 fresh.close()
 
 # GPU selection, with CTranslate2 replaced, because the test machine may have no NVIDIA GPU

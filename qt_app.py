@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 )
 
 from engine import (
+    ARGOS_EXTENSION,
     AUTO_DETECT,
     DATA_DIR,
     LID_CONFIDENCE,
@@ -40,12 +41,14 @@ from engine import (
     EngineError,
     Preferences,
     downloaded_model,
+    extract_argos_package,
     find_sentencepiece,
     cuda_libraries_found,
     gpu_count,
     format_duration,
     longest_line,
     memory_warning,
+    package_languages,
     read_text_file,
     write_text_file,
 )
@@ -244,6 +247,7 @@ class Window(QMainWindow):
         self.cancel_action = self.action(translate_menu, "Cancel", self.cancel, "Esc", enabled=False)
         translate_menu.addSeparator()
         self.action(translate_menu, "Open Model...", self.open_model, "Ctrl+M")
+        self.action(translate_menu, "Open Argos Package...", self.open_argos_package)
         self.action(translate_menu, "Choose SentencePiece Model...", self.choose_sp_model)
         translate_menu.addSeparator()
         self.action(translate_menu, "Swap Languages", self.swap_languages, "Ctrl+Shift+S")
@@ -282,8 +286,8 @@ class Window(QMainWindow):
 
     # Languages
 
-    def set_languages(self, model_type):
-        """Fill the language lists for the kind of model"""
+    def set_languages(self, model_type, model_dir=None):
+        """Fill the language lists for the kind of model; an Argos Translate package names its two languages"""
         if model_type in self.engine.language_lists:
             names = sorted(self.engine.language_codes)
             self.source_combo.set_languages([AUTO_DETECT] + names, True)
@@ -293,8 +297,9 @@ class Window(QMainWindow):
             for widget in (self.source_combo, self.target_combo, self.swap_button):
                 widget.setEnabled(True)
         else:
-            self.source_combo.set_languages([AUTO_DETECT], False)
-            self.target_combo.set_languages(["Not needed" if model_type else "Open a model first"], False)
+            languages = package_languages(model_dir) if model_type and model_dir else None
+            self.source_combo.set_languages([languages[0] if languages else AUTO_DETECT], False)
+            self.target_combo.set_languages([languages[1] if languages else "Not needed" if model_type else "Open a model first"], False)
             for widget in (self.source_combo, self.target_combo, self.swap_button):
                 widget.setEnabled(False)
 
@@ -353,6 +358,24 @@ class Window(QMainWindow):
         if model_dir:
             self.open_model_folder(model_dir)
 
+    def open_argos_package(self, path=None):
+        """Extract an Argos Translate package (.argosmodel) to the models folder, and open its model"""
+        if not path:
+            downloads = os.path.expanduser("~/Downloads")
+            path, _ = QFileDialog.getOpenFileName(self, "Open an Argos Translate package", downloads if os.path.isdir(downloads) else "",
+                                                  "Argos Translate package (*" + ARGOS_EXTENSION + ");;All files (*)")
+        if not path:
+            return
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            model_dir = extract_argos_package(path)
+        except EngineError as error:
+            self.show_error(error.title, error.message)
+            return
+        finally:
+            QApplication.restoreOverrideCursor()
+        self.open_model_folder(model_dir)
+
     def open_model_folder(self, model_dir):
         if not self.load_model(model_dir):
             return
@@ -397,8 +420,10 @@ class Window(QMainWindow):
             self.preferences.set("device", "cpu")
             self.show_error("The GPU cannot be used", problem + "\n\nThe model runs on the CPU.")
         if changed:
-            self.set_languages(self.engine.model_type)
+            self.set_languages(self.engine.model_type, model_dir)
             self.restore_target()
+        elif self.engine.model_type not in self.engine.language_lists:  # a bilingual model names its own languages
+            self.set_languages(self.engine.model_type, model_dir)
         self.show_model_name(model_dir)
         self.source_text.setFocus()
         self.save_settings()
@@ -406,7 +431,9 @@ class Window(QMainWindow):
 
     def show_model_name(self, model_dir):
         self.target_text.setPlaceholderText("Translation")
-        self.model_label.setText("Model: " + short_text(os.path.basename(os.path.normpath(model_dir)), 40)
+        languages = package_languages(model_dir) if self.engine.model_type == "other" else None  # the folder of a package is only called model
+        name = " to ".join(languages) if languages else os.path.basename(os.path.normpath(model_dir))
+        self.model_label.setText("Model: " + short_text(name, 40)
                                  + (" (GPU)" if self.engine.device == "cuda" else ""))
         self.model_label.setToolTip(model_dir + ("\nNVIDIA GPU, " + self.engine.compute_type if self.engine.device == "cuda" else "\nCPU"))
 
@@ -430,7 +457,7 @@ class Window(QMainWindow):
         model_dir, sp_path = self.preferences.get("ct2_model", ""), self.preferences.get("sp_model", "")
         if self.engine.is_model(model_dir):
             self.engine.inspect_model(model_dir)
-            self.set_languages(self.engine.model_type)
+            self.set_languages(self.engine.model_type, model_dir)
             self.restore_target()
             self.pending_model = model_dir
             self.show_model_name(model_dir)
@@ -528,6 +555,9 @@ class Window(QMainWindow):
             self.open_text_file(path)
 
     def open_text_file(self, path, encoding=None):
+        if path.lower().endswith(ARGOS_EXTENSION):  # a dropped Argos Translate package is a model, not a text
+            self.open_argos_package(path)
+            return
         try:
             text, encoding = read_text_file(path, encoding)
         except EngineError as error:

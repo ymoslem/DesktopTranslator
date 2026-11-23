@@ -224,6 +224,87 @@ def download_model(info=MODEL_DOWNLOAD, is_cancelled=lambda: False, on_progress=
         shutil.rmtree(extracted, ignore_errors=True)
 
 
+ARGOS_EXTENSION = ".argosmodel"
+ARGOS_PARTS = ("model", "sentencepiece.model", "metadata.json")  # the parts of an Argos Translate package that the app uses
+
+
+def extract_argos_package(path):
+    """Extract an Argos Translate package (a zip file with the extension .argosmodel) to the models folder
+
+    Only the model, its SentencePiece model, and the metadata are extracted; the Stanza sentence splitter of
+    the package is not used by the app. A package that was extracted before is not extracted again.
+
+    Returns:
+        The model folder of the package
+
+    Raises:
+        EngineError: The file is not a package, there is not enough disk space, or it cannot be extracted
+    """
+    not_a_package = EngineError("Not an Argos package", "This file is not an Argos Translate package with a CTranslate2 model, a SentencePiece model, and metadata.")
+    try:
+        with zipfile.ZipFile(path) as archive:
+            wanted, roots = {}, set()
+            for info in archive.infolist():
+                pieces = re.split(r"[\\/]", info.filename)
+                if info.is_dir() or len(pieces) < 2 or pieces[1] not in ARGOS_PARTS:
+                    continue
+                if not pieces[0] or any(piece in ("", ".", "..") or ":" in piece for piece in pieces):
+                    raise EngineError("Not an Argos package", "The package has a file name that is not safe to extract: " + info.filename)
+                wanted[tuple(pieces[1:])] = info
+                roots.add(pieces[0])
+            if len(roots) != 1 or ("model", "model.bin") not in wanted or ("sentencepiece.model",) not in wanted or ("metadata.json",) not in wanted:
+                raise not_a_package
+            try:
+                metadata = json.loads(archive.read(wanted[("metadata.json",)]).decode("utf-8"))
+                languages = (metadata["from_name"], metadata["to_name"])
+            except (ValueError, KeyError, TypeError):
+                raise not_a_package
+            if not all(isinstance(name, str) and name for name in languages):
+                raise not_a_package
+            name = re.sub(r"[^A-Za-z0-9._-]", "_", roots.pop()) or "package"
+            parent = os.path.join(models_dir(), "argos")
+            final = os.path.join(parent, name)
+            model_file = os.path.join(final, "model", "model.bin")
+            if os.path.isfile(model_file) and os.path.getsize(model_file) == wanted[("model", "model.bin")].file_size:
+                return os.path.join(final, "model")
+            os.makedirs(parent, exist_ok=True)
+            total = sum(info.file_size for info in wanted.values())
+            if shutil.disk_usage(parent).free < 1.5 * total:
+                raise EngineError("Not enough disk space", "Extracting this package needs about %.1f GB of free disk space." % (1.5 * total / 1e9))
+            extracting = final + ".extracting"
+            shutil.rmtree(extracting, ignore_errors=True)
+            try:
+                for pieces, info in wanted.items():
+                    destination = os.path.join(extracting, *pieces)
+                    os.makedirs(os.path.dirname(destination), exist_ok=True)
+                    with archive.open(info) as source, open(destination, "wb") as output:
+                        shutil.copyfileobj(source, output)
+                shutil.rmtree(final, ignore_errors=True)
+                shutil.move(extracting, final)
+            finally:
+                shutil.rmtree(extracting, ignore_errors=True)
+            return os.path.join(final, "model")
+    except (OSError, zipfile.BadZipFile) as error:
+        raise EngineError("Cannot open the package", "The package could not be extracted (%s)." % error)
+
+
+def package_languages(model_dir):
+    """The names of the source and target languages from the metadata.json of an Argos Translate package, or None
+
+    The metadata is searched in the model folder and in the folder above it.
+    """
+    for folder in (model_dir, os.path.dirname(os.path.normpath(model_dir))):
+        try:
+            with open(os.path.join(folder, "metadata.json"), encoding="utf-8") as file:
+                metadata = json.load(file)
+            source, target = metadata["from_name"], metadata["to_name"]
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+        if isinstance(source, str) and isinstance(target, str) and source and target:
+            return source, target
+    return None
+
+
 class Preferences:
     """The settings that are kept between sessions"""
 
