@@ -1,8 +1,8 @@
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.5-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.5/DesktopTranslator_Windows_0.4.5.exe)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.5-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.5/DesktopTranslator_macOS_0.4.5.zip)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.6-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.6/DesktopTranslator_Windows_0.4.6.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.6-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.6/DesktopTranslator_macOS_0.4.6.zip)
 
 # DesktopTranslator
-DesktopTranslator translates text and documents on your own computer. Nothing is sent to a server, and no internet connection is needed once you have a model. It runs [CTranslate2](https://github.com/OpenNMT/CTranslate2) models with SentencePiece, including the multilingual [NLLB-200](https://arxiv.org/abs/2207.04672) (200 languages) and [M2M-100](https://arxiv.org/abs/2010.11125) (100 languages) and bilingual models such as OPUS-MT.
+DesktopTranslator translates text and documents on your own computer. Nothing is sent to a server, and no internet connection is needed once you have a model. It runs [CTranslate2](https://github.com/OpenNMT/CTranslate2) models with SentencePiece, including the multilingual [NLLB-200](https://arxiv.org/abs/2207.04672) (200 languages) and [M2M-100](https://arxiv.org/abs/2010.11125) (100 languages) and bilingual models such as OPUS-MT, including [Argos Translate](https://github.com/argosopentech/argos-translate) packages.
 
 * The source language is detected, and each sentence is translated on its own, keeping your paragraphs
 * The translation appears as it is made, and you can cancel and keep what is done
@@ -34,8 +34,8 @@ DesktopTranslator translates text and documents on your own computer. Nothing is
     
 ## Download DesktopTranslator
    
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.5-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.5/DesktopTranslator_Windows_0.4.5.exe)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.5-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.5/DesktopTranslator_macOS_0.4.5.zip)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.6-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.6/DesktopTranslator_Windows_0.4.6.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.6-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.6/DesktopTranslator_macOS_0.4.6.zip)
 
 <img src="img/installer.png" width="497">
 
@@ -139,7 +139,7 @@ The source and target tokenization SentencePiece models can be found in the same
 2. In DesktopTranslator, choose <kbd>Translate</kbd> menu \> <kbd>Open Argos Package...</kbd>, or drop the file on the left text area. The app extracts the model into its models folder and opens it.
 3. The <kbd>From</kbd> and <kbd>To</kbd> boxes show the two languages of the package. Type or open your text, and click <kbd>Translate</kbd>.
 
-Quality differs between packages and language pairs, so try a package on your own texts first. To extract a package yourself, rename the file to `.zip`, unzip it, and open its `model` folder with <kbd>Open Model...</kbd>. The SentencePiece model is found in the folder above it.
+Quality differs between packages and language pairs, so try a package on your own texts first. To extract a package yourself, rename the file to `.zip`, unzip it, and open its `model` folder with <kbd>Open Model...</kbd> in DesktopTranslator. The SentencePiece model is found in the folder above it.
 
 
 ### French-to-English Generic Model
@@ -172,7 +172,7 @@ pyinstaller -y --windowed --name DesktopTranslator --add-data "utils;utils" --ad
 3. Try the `*.exe` file under "dist\DesktopTranslator" to make sure it works.
 4. Download and install [NSIS](https://nsis.sourceforge.io/Download), and then create the installer with the script [installer.nsi](installer.nsi). It installs the app to "Program Files", and adds Start menu and Desktop shortcuts and an uninstaller.
 ```
-makensis /DVERSION=0.4.5 installer.nsi
+makensis /DVERSION=0.4.6 installer.nsi
 ```
 
 If you prefer to create the installer with the NSIS graphical interface, you can follow these steps instead of step 4:

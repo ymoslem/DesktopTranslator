@@ -1,12 +1,16 @@
 # Changelog
 
 
-## Unreleased
+## v0.4.6
 
 ### Added
 
 - Help > Get Models... downloads and opens the NLLB-200 600M and 1.3B models inside the app, with progress, cancel and a checksum check. Other models still open in the browser
 - Translate > Open Argos Package... opens an Argos Translate package (`.argosmodel`), also when you drop it on the text area. The app extracts the model and shows the two languages of the package in the From and To boxes
+
+### Fixed
+
+- If the SentencePiece file saved from the last session was moved or deleted, the app now looks for it again in the folders of the model at the start. If the model opens without a SentencePiece model, translating says so, instead of asking you to open a model
 
 
 ## v0.4.5
