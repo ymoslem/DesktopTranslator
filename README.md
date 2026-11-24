@@ -1,5 +1,6 @@
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.6-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.6/DesktopTranslator_Windows_0.4.6.exe)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.6-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.6/DesktopTranslator_macOS_0.4.6.zip)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.6-blue?style=for-the-badge)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.6/DesktopTranslator_Windows_0.4.6.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.6-red?style=for-the-badge)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.6/DesktopTranslator_macOS_0.4.6.zip)
+[![Support this project on Ko-fi](https://img.shields.io/badge/Support_this_project-2EA44F?logo=ko-fi&logoColor=white&style=for-the-badge)](https://ko-fi.com/ymoslem)
 
 # DesktopTranslator
 DesktopTranslator translates text and documents on your own computer. Nothing is sent to a server, and no internet connection is needed once you have a model. It runs [CTranslate2](https://github.com/OpenNMT/CTranslate2) models with SentencePiece, including the multilingual [NLLB-200](https://arxiv.org/abs/2207.04672) (200 languages) and [M2M-100](https://arxiv.org/abs/2010.11125) (100 languages) and bilingual models such as OPUS-MT, including [Argos Translate](https://github.com/argosopentech/argos-translate) packages.
@@ -34,8 +35,8 @@ DesktopTranslator translates text and documents on your own computer. Nothing is
     
 ## Download DesktopTranslator
    
-[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.6-blue)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.6/DesktopTranslator_Windows_0.4.6.exe)
-[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.6-red)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.6/DesktopTranslator_macOS_0.4.6.zip)
+[![DesktopTranslator](https://img.shields.io/badge/Download-Windows_Installer_v0.4.6-blue?style=for-the-badge)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.6/DesktopTranslator_Windows_0.4.6.exe)
+[![DesktopTranslator](https://img.shields.io/badge/Download-macOS_App_v0.4.6-red?style=for-the-badge)](https://github.com/ymoslem/DesktopTranslator/releases/download/v0.4.6/DesktopTranslator_macOS_0.4.6.zip)
 
 <img src="img/installer.png" width="497">
 
