@@ -1001,6 +1001,45 @@ check(isinstance(context, ssl.SSLContext) and context.verify_mode == ssl.CERT_RE
       and len(seen_contexts) == 1 and isinstance(seen_contexts[0], ssl.SSLContext), "web requests check certificates against the bundle of certifi")
 check(gui.updates.is_newer("v0.4.10", "0.4.9") and gui.updates.is_newer("v0.5.0", "0.4.9") and not gui.updates.is_newer("v0.4.2", "0.4.2")
       and not gui.updates.is_newer("v0.4.1", "0.4.2-dev"), "versions are compared by their numbers")
+
+
+# The command line check of a packaged app: GitHub answering with a rate limit still shows that GitHub is reached
+class GithubStub(http.server.BaseHTTPRequestHandler):
+    answers = {
+        "/ok": (200, {}, b'{"tag_name": "v9.9.9", "html_url": "https://example.org"}'),
+        "/limit": (403, {"X-RateLimit-Remaining": "0"}, b'{"message": "API rate limit exceeded"}'),
+        "/secondary": (403, {"Retry-After": "60"}, b'{"message": "secondary rate limit"}'),
+        "/forbidden": (403, {}, b'{"message": "Forbidden"}'),
+        "/missing": (404, {}, b'{"message": "Not Found"}'),
+    }
+
+    def do_GET(self):
+        code, headers, body = self.answers[self.path]
+        self.send_response(code)
+        for name, value in headers.items():
+            self.send_header(name, value)
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+stub = http.server.HTTPServer(("127.0.0.1", 0), GithubStub)
+threading.Thread(target=stub.serve_forever, daemon=True).start()
+real_url, real_argv = gui.updates.LATEST_URL, sys.argv
+codes = {}
+for path in GithubStub.answers:
+    gui.updates.LATEST_URL = "http://127.0.0.1:%d%s" % (stub.server_port, path)
+    sys.argv = ["DesktopTranslator", "--check-update"]
+    try:
+        qt_app.main()
+    except SystemExit as stop:
+        codes[path] = stop.code
+gui.updates.LATEST_URL, sys.argv = real_url, real_argv
+stub.shutdown()
+check(codes == {"/ok": 0, "/limit": 0, "/secondary": 0, "/forbidden": 1, "/missing": 1},
+      "--check-update succeeds when GitHub answers or limits the requests, and fails on other errors: " + str(codes))
 latest = {"tag_name": "v9.9.9", "html_url": "https://example.org/releases/v9.9.9"}
 
 

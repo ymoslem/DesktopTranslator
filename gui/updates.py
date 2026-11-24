@@ -1,6 +1,7 @@
 """The check for a newer version of the app, which runs only when the user asks for it"""
 import json
 import re
+import urllib.error
 import urllib.request
 
 from engine import ssl_context
@@ -24,3 +25,9 @@ def fetch_latest(timeout=10):
     with urllib.request.urlopen(request, timeout=timeout, context=ssl_context()) as response:
         data = json.load(response)
     return data["tag_name"], data.get("html_url") or RELEASES_URL
+
+
+def is_rate_limited(error):
+    """True if GitHub answered with a rate limit; the answer also shows that the connection and the certificates work"""
+    return (isinstance(error, urllib.error.HTTPError) and error.code in (403, 429)
+            and (error.headers.get("X-RateLimit-Remaining") == "0" or error.headers.get("Retry-After") is not None))

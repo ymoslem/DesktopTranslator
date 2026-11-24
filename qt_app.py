@@ -910,6 +910,9 @@ def main():
             print(updates.fetch_latest())
             sys.exit(0)
         except Exception as error:
+            if updates.is_rate_limited(error):  # GitHub answered, so the app reaches it; the shared address of a test machine has used its requests
+                print("GitHub answered with a rate limit, so it was reached (" + str(error) + ")")
+                sys.exit(0)
             print(error)
             sys.exit(1)
     app = QApplication(sys.argv)
